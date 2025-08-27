@@ -1,0 +1,154 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  /* MS Office inspired color scheme - Light Mode */
+  --background: hsl(0 0% 99%);
+  --foreground: hsl(210 20% 15%);
+  --card: hsl(0 0% 100%);
+  --card-foreground: hsl(210 20% 15%);
+  --popover: hsl(0 0% 100%);
+  --popover-foreground: hsl(210 20% 15%);
+  --primary: hsl(205 87% 47%);
+  --primary-foreground: hsl(0 0% 100%);
+  --secondary: hsl(210 40% 95%);
+  --secondary-foreground: hsl(210 20% 15%);
+  --muted: hsl(210 40% 97%);
+  --muted-foreground: hsl(215 16% 47%);
+  --accent: hsl(205 100% 96%);
+  --accent-foreground: hsl(205 87% 47%);
+  --destructive: hsl(0 84% 60%);
+  --destructive-foreground: hsl(0 0% 100%);
+  --border: hsl(214 32% 91%);
+  --input: hsl(214 32% 97%);
+  --ring: hsl(205 87% 47%);
+  --chart-1: hsl(205 87% 47%);
+  --chart-2: hsl(142 76% 36%);
+  --chart-3: hsl(45 94% 47%);
+  --chart-4: hsl(262 83% 58%);
+  --chart-5: hsl(334 82% 59%);
+  
+  /* Sidebar - MS Office ribbon style */
+  --sidebar: hsl(210 40% 98%);
+  --sidebar-foreground: hsl(210 20% 15%);
+  --sidebar-primary: hsl(205 87% 47%);
+  --sidebar-primary-foreground: hsl(0 0% 100%);
+  --sidebar-accent: hsl(205 100% 96%);
+  --sidebar-accent-foreground: hsl(205 87% 47%);
+  --sidebar-border: hsl(214 32% 91%);
+  --sidebar-ring: hsl(205 87% 47%);
+  
+  /* Header styling */
+  --header-bg: hsl(0 0% 100%);
+  --header-border: hsl(214 32% 91%);
+  
+  /* Office branding colors */
+  --office-blue: hsl(205 87% 47%);
+  --office-word: hsl(217 100% 47%);
+  --office-excel: hsl(142 76% 36%);
+  --office-powerpoint: hsl(14 100% 57%);
+  --office-outlook: hsl(203 89% 53%);
+  --office-access: hsl(348 83% 47%);
+  --office-onenote: hsl(262 83% 58%);
+  
+  --font-sans: 'Inter', 'Segoe UI', system-ui, sans-serif;
+  --font-serif: Georgia, serif;
+  --font-mono: 'Consolas', 'Monaco', monospace;
+  --radius: 0.5rem;
+  --dark-bg: hsl(220 27% 12%);
+  --dark-card: hsl(220 24% 15%);
+  --dark-sidebar: hsl(220 27% 12%);
+}
+
+.dark {
+  /* MS Office dark theme */
+  --background: hsl(220 27% 12%);
+  --foreground: hsl(210 20% 85%);
+  --card: hsl(220 24% 15%);
+  --card-foreground: hsl(210 20% 85%);
+  --popover: hsl(220 24% 15%);
+  --popover-foreground: hsl(210 20% 85%);
+  --primary: hsl(205 87% 55%);
+  --primary-foreground: hsl(0 0% 100%);
+  --secondary: hsl(220 24% 20%);
+  --secondary-foreground: hsl(210 20% 85%);
+  --muted: hsl(220 24% 18%);
+  --muted-foreground: hsl(215 16% 65%);
+  --accent: hsl(220 24% 20%);
+  --accent-foreground: hsl(205 87% 55%);
+  --destructive: hsl(0 84% 60%);
+  --destructive-foreground: hsl(0 0% 100%);
+  --border: hsl(220 24% 22%);
+  --input: hsl(220 24% 18%);
+  --ring: hsl(205 87% 55%);
+  
+  /* Dark sidebar */
+  --sidebar: hsl(220 24% 15%);
+  --sidebar-foreground: hsl(210 20% 85%);
+  --sidebar-primary: hsl(205 87% 55%);
+  --sidebar-primary-foreground: hsl(0 0% 100%);
+  --sidebar-accent: hsl(220 24% 20%);
+  --sidebar-accent-foreground: hsl(205 87% 55%);
+  --sidebar-border: hsl(220 24% 22%);
+  --sidebar-ring: hsl(205 87% 55%);
+  
+  /* Dark header */
+  --header-bg: hsl(220 24% 15%);
+  --header-border: hsl(220 24% 22%);
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply font-sans antialiased bg-background text-foreground transition-colors duration-300;
+    font-family: 'Inter', system-ui, sans-serif;
+  }
+}
+
+@layer components {
+  /* Navigation styles */
+  .nav-item.active {
+    @apply bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300 border-l-2 border-blue-500;
+  }
+  
+  .nav-item:hover {
+    @apply bg-gray-50 dark:bg-gray-800 transition-colors;
+  }
+  
+  /* Office-style buttons */
+  .office-btn {
+    @apply px-4 py-2 rounded-md font-medium transition-all duration-200 ease-in-out;
+    @apply hover:shadow-md active:scale-95;
+  }
+  
+  .office-btn-primary {
+    @apply bg-blue-600 text-white hover:bg-blue-700;
+  }
+  
+  .office-btn-secondary {
+    @apply bg-gray-100 text-gray-900 hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-100 dark:hover:bg-gray-700;
+  }
+  
+  /* Modern card styles */
+  .office-card {
+    @apply bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-sm hover:shadow-md transition-shadow duration-200;
+  }
+  
+  /* Office ribbon style header */
+  .office-header {
+    @apply bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-700;
+  }
+  
+  /* MS Office tool card styling */
+  .tool-card-word { @apply border-l-4 border-blue-600; }
+  .tool-card-excel { @apply border-l-4 border-green-600; }
+  .tool-card-powerpoint { @apply border-l-4 border-orange-600; }
+  .tool-card-outlook { @apply border-l-4 border-blue-500; }
+  .tool-card-access { @apply border-l-4 border-red-600; }
+  .tool-card-onenote { @apply border-l-4 border-purple-600; }
+}
