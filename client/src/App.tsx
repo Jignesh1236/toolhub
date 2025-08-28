@@ -90,6 +90,8 @@ import KeywordExtractor from "@/pages/tools/keyword-extractor";
 import SentimentAnalyzer from "@/pages/tools/sentiment-analyzer";
 import FileShare from "@/pages/tools/file-share";
 import SharedFile from "@/pages/shared-file";
+import TextShare from "@/pages/tools/text-share";
+import SharedText from "@/pages/shared-text";
 
 // MS Office Suite imports
 import WordProcessor from "@/pages/tools/word-processor";
@@ -107,6 +109,9 @@ function Router() {
       {/* Shared file access route */}
       <Route path="/shared/:id" component={SharedFile} />
       
+      {/* Shared text access route */}
+      <Route path="/shared-text/:id" component={SharedText} />
+      
       {/* MS Office Suite */}
       <Route path="/tools/word-processor" component={WordProcessor} />
       <Route path="/tools/spreadsheet" component={Spreadsheet} />
@@ -117,6 +122,9 @@ function Router() {
       
       {/* File Sharing */}
       <Route path="/tools/file-share" component={FileShare} />
+      
+      {/* Text Sharing */}
+      <Route path="/tools/text-share" component={TextShare} />
       
       {/* Media Tools */}
       <Route path="/tools/image-resizer" component={ImageResizer} />
