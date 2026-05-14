@@ -112,10 +112,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         isPublic: true
       });
 
+      console.log("File saved to DB:", sharedFile);
       res.json(sharedFile);
     } catch (error) {
-      console.error("File share error:", error);
-      res.status(500).json({ error: "Failed to share file" });
+      console.error("File share error details:", error);
+      res.status(500).json({ error: "Failed to share file", details: error instanceof Error ? error.message : String(error) });
     }
   });
 

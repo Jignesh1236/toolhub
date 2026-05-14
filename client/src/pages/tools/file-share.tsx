@@ -75,13 +75,19 @@ export default function FileShare() {
 
       const uploadPromise = new Promise((resolve, reject) => {
         xhr.onload = () => {
-          if (xhr.status >= 200 && xhr.status < 300) {
-            resolve(JSON.parse(xhr.responseText));
-          } else {
-            reject(new Error(JSON.parse(xhr.responseText).error || "Upload failed"));
+          try {
+            const responseText = xhr.responseText;
+            if (xhr.status >= 200 && xhr.status < 300) {
+              resolve(JSON.parse(responseText));
+            } else {
+              const errorData = responseText ? JSON.parse(responseText) : { error: "Upload failed" };
+              reject(new Error(errorData.details || errorData.error || "Upload failed"));
+            }
+          } catch (e) {
+            reject(new Error("Invalid server response"));
           }
         };
-        xhr.onerror = () => reject(new Error("Network error"));
+        xhr.onerror = () => reject(new Error("Network error or Server unreachable"));
       });
 
       xhr.open("POST", "/api/files");
