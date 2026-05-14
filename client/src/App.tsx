@@ -89,9 +89,7 @@ import Chatbot from "@/pages/tools/chatbot";
 import KeywordExtractor from "@/pages/tools/keyword-extractor";
 import SentimentAnalyzer from "@/pages/tools/sentiment-analyzer";
 import FileShare from "@/pages/tools/file-share";
-import SharedFile from "@/pages/shared-file";
 import TextShare from "@/pages/tools/text-share";
-import SharedText from "@/pages/shared-text";
 
 // New tools imports
 import BusinessCardGenerator from "@/pages/tools/business-card-generator";
@@ -123,12 +121,6 @@ function Router() {
   return (
     <Switch>
       <Route path="/" component={Dashboard} />
-      
-      {/* Shared file access route */}
-      <Route path="/shared/:id" component={SharedFile} />
-      
-      {/* Shared text access route */}
-      <Route path="/shared-text/:id" component={SharedText} />
       
       {/* MS Office Suite */}
       <Route path="/tools/word-processor" component={WordProcessor} />

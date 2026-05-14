@@ -9,6 +9,8 @@ export interface Tool {
   usageCount?: number;
   lastUsed?: string;
   color: string;
+  isMagic?: boolean;
+  html?: string;
 }
 
 export const toolCategories = [

@@ -34,33 +34,17 @@ export interface IStorage {
     bookmarked: number;
     timeSaved: string;
   }>;
-  // File sharing methods
-  saveSharedFile(file: InsertSharedFile): Promise<SharedFile>;
-  getSharedFile(id: string): Promise<SharedFile | undefined>;
-  getAllSharedFiles(): Promise<SharedFile[]>;
-  incrementDownloadCount(id: string): Promise<void>;
-  deleteSharedFile(id: string): Promise<void>;
-  // Text sharing methods
-  saveSharedText(text: InsertSharedText): Promise<SharedText>;
-  getSharedText(id: string): Promise<SharedText | undefined>;
-  getAllSharedTexts(): Promise<SharedText[]>;
-  incrementTextViewCount(id: string): Promise<void>;
-  deleteSharedText(id: string): Promise<void>;
 }
 
 export class MemStorage implements IStorage {
   private users: Map<string, User>;
   private toolUsage: Map<string, ToolUsage>;
   private bookmarks: Map<string, Bookmark>;
-  private sharedFiles: Map<string, SharedFile>;
-  private sharedTexts: Map<string, SharedText>;
 
   constructor() {
     this.users = new Map();
     this.toolUsage = new Map();
     this.bookmarks = new Map();
-    this.sharedFiles = new Map();
-    this.sharedTexts = new Map();
   }
 
   async getUser(id: string): Promise<User | undefined> {
@@ -160,82 +144,6 @@ export class MemStorage implements IStorage {
       bookmarked,
       timeSaved
     };
-  }
-
-  // File sharing implementation
-  async saveSharedFile(insertFile: InsertSharedFile): Promise<SharedFile> {
-    const id = randomUUID();
-    const sharedFile: SharedFile = {
-      id,
-      filename: insertFile.filename,
-      originalName: insertFile.originalName,
-      mimeType: insertFile.mimeType,
-      fileSize: insertFile.fileSize,
-      uploadedAt: new Date(),
-      expiresAt: insertFile.expiresAt || null,
-      downloadCount: 0,
-      maxDownloads: insertFile.maxDownloads || null,
-      isPublic: insertFile.isPublic ?? true
-    };
-    this.sharedFiles.set(id, sharedFile);
-    return sharedFile;
-  }
-
-  async getSharedFile(id: string): Promise<SharedFile | undefined> {
-    return this.sharedFiles.get(id);
-  }
-
-  async getAllSharedFiles(): Promise<SharedFile[]> {
-    return Array.from(this.sharedFiles.values());
-  }
-
-  async incrementDownloadCount(id: string): Promise<void> {
-    const file = this.sharedFiles.get(id);
-    if (file) {
-      const updatedFile = { ...file, downloadCount: (file.downloadCount || 0) + 1 };
-      this.sharedFiles.set(id, updatedFile);
-    }
-  }
-
-  async deleteSharedFile(id: string): Promise<void> {
-    this.sharedFiles.delete(id);
-  }
-
-  // Text sharing implementation
-  async saveSharedText(insertText: InsertSharedText): Promise<SharedText> {
-    const id = randomUUID();
-    const sharedText: SharedText = {
-      id,
-      title: insertText.title,
-      content: insertText.content,
-      uploadedAt: new Date(),
-      expiresAt: insertText.expiresAt || null,
-      downloadCount: 0,
-      maxDownloads: insertText.maxDownloads || null,
-      isPublic: insertText.isPublic ?? true
-    };
-    this.sharedTexts.set(id, sharedText);
-    return sharedText;
-  }
-
-  async getSharedText(id: string): Promise<SharedText | undefined> {
-    return this.sharedTexts.get(id);
-  }
-
-  async getAllSharedTexts(): Promise<SharedText[]> {
-    return Array.from(this.sharedTexts.values());
-  }
-
-  async incrementTextViewCount(id: string): Promise<void> {
-    const text = this.sharedTexts.get(id);
-    if (text) {
-      const updatedText = { ...text, downloadCount: text.downloadCount + 1 };
-      this.sharedTexts.set(id, updatedText);
-    }
-  }
-
-  async deleteSharedText(id: string): Promise<void> {
-    this.sharedTexts.delete(id);
   }
 }
 

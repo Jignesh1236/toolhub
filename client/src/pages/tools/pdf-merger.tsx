@@ -38,21 +38,18 @@ export default function PDFMerger() {
     setProcessing(true);
 
     try {
-      const formData = new FormData();
-      selectedFiles.forEach((file) => {
-        formData.append('pdf', file);
-      });
+      const { PDFDocument } = await import('pdf-lib');
+      const mergedPdf = await PDFDocument.create();
 
-      const response = await fetch('/api/pdf/merge', {
-        method: 'POST',
-        body: formData,
-      });
-
-      if (!response.ok) {
-        throw new Error('Failed to merge PDFs');
+      for (const file of selectedFiles) {
+        const arrayBuffer = await file.arrayBuffer();
+        const pdf = await PDFDocument.load(arrayBuffer);
+        const copiedPages = await mergedPdf.copyPages(pdf, pdf.getPageIndices());
+        copiedPages.forEach((page) => mergedPdf.addPage(page));
       }
 
-      const blob = await response.blob();
+      const mergedPdfBytes = await mergedPdf.save();
+      const blob = new Blob([mergedPdfBytes], { type: 'application/pdf' });
       const url = URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = url;
@@ -65,6 +62,7 @@ export default function PDFMerger() {
         description: "PDFs merged and downloaded successfully.",
       });
     } catch (error) {
+      console.error("PDF merge error:", error);
       toast({
         title: "Error",
         description: "Failed to merge PDFs. Please try again.",

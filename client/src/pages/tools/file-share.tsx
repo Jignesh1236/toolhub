@@ -32,14 +32,9 @@ export default function FileShare() {
   const [isUploading, setIsUploading] = useState(false);
   const { toast } = useToast();
 
-  const { data: files, refetch } = useQuery<SharedFile[]>({
-    queryKey: ["/api/files"],
-    staleTime: 5 * 60 * 1000
-  });
-
   const uploadMutation = useMutation({
     mutationFn: async (formData: FormData) => {
-      const response = await fetch("/api/files/upload", {
+      const response = await fetch("https://tmpfiles.org/api/v1/upload", {
         method: "POST",
         body: formData,
       });
@@ -49,10 +44,11 @@ export default function FileShare() {
       }
       return response.json();
     },
-    onSuccess: async (data) => {
+    onSuccess: async (response) => {
+      const data = response.data;
       toast({
         title: "✅ File uploaded successfully",
-        description: `${data.filename} is now available for sharing`,
+        description: "File is now available for sharing",
       });
       setSelectedFile(null);
       setMaxDownloads("");
@@ -60,7 +56,7 @@ export default function FileShare() {
       
       // Generate QR code for the share URL
       try {
-        const qrCodeDataUrl = await QRCode.toDataURL(data.shareUrl, {
+        const qrCodeDataUrl = await QRCode.toDataURL(data.url, {
           width: 200,
           margin: 1,
           color: {
@@ -73,7 +69,7 @@ export default function FileShare() {
         console.error("QR code generation failed:", error);
       }
       
-      queryClient.invalidateQueries({ queryKey: ["/api/files"] });
+      // queryClient.invalidateQueries({ queryKey: ["/api/files"] });
       setIsUploading(false);
     },
     onError: (error: any) => {
@@ -83,31 +79,6 @@ export default function FileShare() {
         variant: "destructive",
       });
       setIsUploading(false);
-    },
-  });
-
-  const deleteMutation = useMutation({
-    mutationFn: async (fileId: string) => {
-      const response = await fetch(`/api/files/${fileId}`, { method: "DELETE" });
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.error || "Delete failed");
-      }
-      return response.json();
-    },
-    onSuccess: () => {
-      toast({
-        title: "✅ File deleted",
-        description: "File has been removed from sharing",
-      });
-      queryClient.invalidateQueries({ queryKey: ["/api/files"] });
-    },
-    onError: (error: any) => {
-      toast({
-        title: "❌ Delete failed",
-        description: error.message,
-        variant: "destructive",
-      });
     },
   });
 
@@ -131,8 +102,12 @@ export default function FileShare() {
     setIsUploading(true);
     const formData = new FormData();
     formData.append("file", selectedFile);
-    if (maxDownloads) formData.append("maxDownloads", maxDownloads);
-    if (expiresIn) formData.append("expiresIn", expiresIn);
+    
+    // tmpfiles.org uses 'expire' in seconds (60-86400)
+    if (expiresIn) {
+      const seconds = Math.min(parseInt(expiresIn) * 3600, 86400);
+      formData.append("expire", seconds.toString());
+    }
 
     uploadMutation.mutate(formData);
   };
@@ -267,9 +242,10 @@ export default function FileShare() {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="1">1 Hour</SelectItem>
+                  <SelectItem value="2">2 Hours</SelectItem>
+                  <SelectItem value="6">6 Hours</SelectItem>
+                  <SelectItem value="12">12 Hours</SelectItem>
                   <SelectItem value="24">24 Hours</SelectItem>
-                  <SelectItem value="168">1 Week</SelectItem>
-                  <SelectItem value="720">1 Month</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -311,101 +287,6 @@ export default function FileShare() {
           </Card>
         )}
       </div>
-
-      {/* Files List */}
-      <Card className="mt-8">
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Share2 className="h-5 w-5" />
-            Shared Files
-          </CardTitle>
-          <CardDescription>
-            Manage your uploaded files and share them
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          {!files || files.length === 0 ? (
-            <div className="text-center py-8">
-              <Share2 className="mx-auto h-12 w-12 text-muted-foreground" />
-              <p className="mt-2 text-sm text-muted-foreground">No files uploaded yet</p>
-            </div>
-          ) : (
-            <div className="space-y-4">
-              {files.map((file) => (
-                <div
-                  key={file.id}
-                  className="flex items-center justify-between p-4 border rounded-lg"
-                  data-testid={`card-file-${file.id}`}
-                >
-                  <div className="flex-1">
-                    <div className="flex items-center gap-2 mb-1">
-                      <h3 className="font-medium">{file.originalName}</h3>
-                      <Badge variant="outline">{formatFileSize(file.fileSize)}</Badge>
-                      {isExpired(file.expiresAt) && (
-                        <Badge variant="destructive">Expired</Badge>
-                      )}
-                      {isDownloadLimitReached(file) && (
-                        <Badge variant="destructive">Limit Reached</Badge>
-                      )}
-                    </div>
-                    <div className="flex items-center gap-4 text-sm text-muted-foreground">
-                      <span className="flex items-center gap-1">
-                        <Download className="h-3 w-3" />
-                        {file.downloadCount} downloads
-                      </span>
-                      {file.maxDownloads && (
-                        <span>Max: {file.maxDownloads}</span>
-                      )}
-                      {file.expiresAt && (
-                        <span className="flex items-center gap-1">
-                          <Clock className="h-3 w-3" />
-                          Expires: {new Date(file.expiresAt).toLocaleDateString()}
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => copyToClipboard(generateShareUrl(file.id))}
-                      data-testid={`button-copy-link-${file.id}`}
-                    >
-                      <Link2 className="h-4 w-4" />
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => generateQRCode(file.id)}
-                      data-testid={`button-generate-qr-${file.id}`}
-                    >
-                      <QrCode className="h-4 w-4" />
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => window.open(`/api/files/${file.id}/download`, "_blank")}
-                      disabled={isExpired(file.expiresAt) || isDownloadLimitReached(file) || false}
-                      data-testid={`button-download-${file.id}`}
-                    >
-                      <Download className="h-4 w-4" />
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => deleteMutation.mutate(file.id)}
-                      disabled={deleteMutation.isPending}
-                      data-testid={`button-delete-${file.id}`}
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </CardContent>
-      </Card>
     </div>
   );
 }

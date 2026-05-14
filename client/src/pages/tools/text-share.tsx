@@ -32,30 +32,35 @@ export default function TextShare() {
   const [isUploading, setIsUploading] = useState(false);
   const { toast } = useToast();
 
-  const { data: texts, refetch } = useQuery<SharedText[]>({
-    queryKey: ["/api/texts"],
-    staleTime: 5 * 60 * 1000
-  });
-
   const uploadMutation = useMutation({
-    mutationFn: async (data: { title: string; content: string; maxDownloads?: string; expiresIn?: string }) => {
-      const response = await fetch("/api/texts/upload", {
+    mutationFn: async (data: { title: string; content: string; expiresIn?: string }) => {
+      const blob = new Blob([data.content], { type: "text/plain" });
+      const file = new File([blob], `${data.title.replace(/\s+/g, "_")}.txt`, { type: "text/plain" });
+      
+      const formData = new FormData();
+      formData.append("file", file);
+      
+      if (data.expiresIn) {
+        const seconds = Math.min(parseInt(data.expiresIn) * 3600, 86400);
+        formData.append("expire", seconds.toString());
+      }
+
+      const response = await fetch("https://tmpfiles.org/api/v1/upload", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(data),
+        body: formData,
       });
+
       if (!response.ok) {
         const error = await response.json();
         throw new Error(error.error || "Upload failed");
       }
       return response.json();
     },
-    onSuccess: async (data) => {
+    onSuccess: async (response) => {
+      const data = response.data;
       toast({
         title: "✅ Text shared successfully",
-        description: `${data.title} is now available for sharing`,
+        description: "Your text is now available for sharing via tmpfiles.org",
       });
       setTextContent("");
       setTextTitle("");
@@ -64,7 +69,7 @@ export default function TextShare() {
       
       // Generate QR code for the share URL
       try {
-        const qrCodeDataUrl = await QRCode.toDataURL(data.shareUrl, {
+        const qrCodeDataUrl = await QRCode.toDataURL(data.url, {
           width: 200,
           margin: 1,
           color: {
@@ -77,7 +82,7 @@ export default function TextShare() {
         console.error("QR code generation failed:", error);
       }
       
-      queryClient.invalidateQueries({ queryKey: ["/api/texts"] });
+      // queryClient.invalidateQueries({ queryKey: ["/api/texts"] });
       setIsUploading(false);
     },
     onError: (error: any) => {
@@ -87,31 +92,6 @@ export default function TextShare() {
         variant: "destructive",
       });
       setIsUploading(false);
-    },
-  });
-
-  const deleteMutation = useMutation({
-    mutationFn: async (textId: string) => {
-      const response = await fetch(`/api/texts/${textId}`, { method: "DELETE" });
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.error || "Delete failed");
-      }
-      return response.json();
-    },
-    onSuccess: () => {
-      toast({
-        title: "✅ Text deleted",
-        description: "Text has been removed from sharing",
-      });
-      queryClient.invalidateQueries({ queryKey: ["/api/texts"] });
-    },
-    onError: (error: any) => {
-      toast({
-        title: "❌ Delete failed",
-        description: error.message,
-        variant: "destructive",
-      });
     },
   });
 
@@ -281,9 +261,10 @@ export default function TextShare() {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="1">1 Hour</SelectItem>
+                  <SelectItem value="2">2 Hours</SelectItem>
+                  <SelectItem value="6">6 Hours</SelectItem>
+                  <SelectItem value="12">12 Hours</SelectItem>
                   <SelectItem value="24">24 Hours</SelectItem>
-                  <SelectItem value="168">1 Week</SelectItem>
-                  <SelectItem value="720">1 Month</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -325,104 +306,6 @@ export default function TextShare() {
           </Card>
         )}
       </div>
-
-      {/* Texts List */}
-      <Card className="mt-8">
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Share2 className="h-5 w-5" />
-            Shared Texts
-          </CardTitle>
-          <CardDescription>
-            Manage your shared texts
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          {!texts || texts.length === 0 ? (
-            <div className="text-center py-8">
-              <Type className="mx-auto h-12 w-12 text-muted-foreground" />
-              <p className="mt-2 text-sm text-muted-foreground">No texts shared yet</p>
-            </div>
-          ) : (
-            <div className="space-y-4">
-              {texts.map((text) => (
-                <div
-                  key={text.id}
-                  className="flex items-center justify-between p-4 border rounded-lg"
-                  data-testid={`card-text-${text.id}`}
-                >
-                  <div className="flex-1">
-                    <div className="flex items-center gap-2 mb-1">
-                      <h3 className="font-medium">{text.title}</h3>
-                      <Badge variant="outline">{text.content.length} chars</Badge>
-                      {isExpired(text.expiresAt) && (
-                        <Badge variant="destructive">Expired</Badge>
-                      )}
-                      {isDownloadLimitReached(text) && (
-                        <Badge variant="destructive">Limit Reached</Badge>
-                      )}
-                    </div>
-                    <div className="flex items-center gap-4 text-sm text-muted-foreground">
-                      <span className="flex items-center gap-1">
-                        <Download className="h-3 w-3" />
-                        {text.downloadCount} views
-                      </span>
-                      {text.maxDownloads && (
-                        <span>Max: {text.maxDownloads}</span>
-                      )}
-                      {text.expiresAt && (
-                        <span className="flex items-center gap-1">
-                          <Clock className="h-3 w-3" />
-                          Expires: {new Date(text.expiresAt).toLocaleDateString()}
-                        </span>
-                      )}
-                    </div>
-                    <p className="text-sm text-muted-foreground mt-1 truncate">
-                      {text.content.substring(0, 100)}...
-                    </p>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => copyToClipboard(generateShareUrl(text.id))}
-                      data-testid={`button-copy-link-${text.id}`}
-                    >
-                      <Link2 className="h-4 w-4" />
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => generateQRCode(text.id)}
-                      data-testid={`button-generate-qr-${text.id}`}
-                    >
-                      <QrCode className="h-4 w-4" />
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => window.open(`/shared-text/${text.id}`, "_blank")}
-                      disabled={isExpired(text.expiresAt) || isDownloadLimitReached(text) || false}
-                      data-testid={`button-view-${text.id}`}
-                    >
-                      <Eye className="h-4 w-4" />
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => deleteMutation.mutate(text.id)}
-                      disabled={deleteMutation.isPending}
-                      data-testid={`button-delete-${text.id}`}
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </CardContent>
-      </Card>
     </div>
   );
 }

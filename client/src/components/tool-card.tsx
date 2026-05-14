@@ -5,9 +5,10 @@ import { useState } from "react";
 interface ToolCardProps {
   tool: Tool;
   onBookmark?: (toolId: string) => void;
+  onClick?: (tool: Tool) => void;
 }
 
-export function ToolCard({ tool, onBookmark }: ToolCardProps) {
+export function ToolCard({ tool, onBookmark, onClick }: ToolCardProps) {
   const [isBookmarked, setIsBookmarked] = useState(tool.isBookmarked || false);
 
   const handleBookmark = (e: React.MouseEvent) => {
@@ -15,6 +16,13 @@ export function ToolCard({ tool, onBookmark }: ToolCardProps) {
     e.stopPropagation();
     setIsBookmarked(!isBookmarked);
     onBookmark?.(tool.id);
+  };
+
+  const handleClick = (e: React.MouseEvent) => {
+    if (tool.isMagic && onClick) {
+      e.preventDefault();
+      onClick(tool);
+    }
   };
 
   const colorClasses = {
@@ -30,6 +38,9 @@ export function ToolCard({ tool, onBookmark }: ToolCardProps) {
     orange: 'bg-orange-50 dark:bg-orange-900/20 text-orange-600 dark:text-orange-400 group-hover:bg-orange-100 dark:group-hover:bg-orange-900/30',
     gray: 'bg-gray-50 dark:bg-gray-700 text-gray-600 dark:text-gray-300 group-hover:bg-gray-100 dark:group-hover:bg-gray-600',
     sky: 'bg-sky-50 dark:bg-sky-900/20 text-sky-600 dark:text-sky-400 group-hover:bg-sky-100 dark:group-hover:bg-sky-900/30',
+    rose: 'bg-rose-50 dark:bg-rose-900/20 text-rose-600 dark:text-rose-400 group-hover:bg-rose-100 dark:group-hover:bg-rose-900/30',
+    amber: 'bg-amber-50 dark:bg-amber-900/20 text-amber-600 dark:text-amber-400 group-hover:bg-amber-100 dark:group-hover:bg-amber-900/30',
+    violet: 'bg-violet-50 dark:bg-violet-900/20 text-violet-600 dark:text-violet-400 group-hover:bg-violet-100 dark:group-hover:bg-violet-900/30',
   };
 
   const tagColors = {
@@ -45,11 +56,14 @@ export function ToolCard({ tool, onBookmark }: ToolCardProps) {
     orange: 'bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-300',
     gray: 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300',
     sky: 'bg-sky-100 dark:bg-sky-900/30 text-sky-700 dark:text-sky-300',
+    rose: 'bg-rose-100 dark:bg-rose-900/30 text-rose-700 dark:text-rose-300',
+    amber: 'bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300',
+    violet: 'bg-violet-100 dark:bg-violet-900/30 text-violet-700 dark:text-violet-300',
   };
 
   return (
-    <Link href={tool.route} data-testid={`tool-card-${tool.id}`}>
-      <div className="bg-white dark:bg-dark-card rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6 hover:shadow-md hover:border-blue-300 dark:hover:border-blue-600 transition-all cursor-pointer group">
+    <Link href={tool.route} data-testid={`tool-card-${tool.id}`} onClick={handleClick}>
+      <div className="bg-white dark:bg-dark-card rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6 hover:shadow-md hover:border-blue-300 dark:hover:border-blue-600 transition-all cursor-pointer group h-full flex flex-col">
         <div className="flex items-start justify-between mb-4">
           <div className={`p-3 rounded-lg transition-colors ${colorClasses[tool.color as keyof typeof colorClasses]}`}>
             <i className={`${tool.icon} text-xl`}></i>
