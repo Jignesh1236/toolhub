@@ -71,9 +71,34 @@ export default function Dashboard() {
       
       const userPrompt = `Generate a fully functional tool for "${searchQuery}".`;
       
-      // Using a simpler URL structure for better reliability
-      const response = await fetch(`https://text.pollinations.ai/${encodeURIComponent(userPrompt)}?system=${encodeURIComponent(systemPrompt)}&seed=${Math.floor(Math.random() * 1000)}&model=qwen-coder`);
-      const html = await response.text();
+      // Primary: Pollinations AI
+      let html = "";
+      try {
+        const response = await fetch(`https://text.pollinations.ai/${encodeURIComponent(userPrompt)}?system=${encodeURIComponent(systemPrompt)}&seed=${Math.floor(Math.random() * 1000)}&model=qwen-coder`);
+        if (!response.ok) throw new Error("Pollinations failed");
+        html = await response.text();
+      } catch (pollError) {
+        console.log("Pollinations failed, trying Hugging Face fallback...");
+        // Fallback: Hugging Face Qwen Coder
+        const hfResponse = await fetch("https://api-inference.huggingface.co/models/Qwen/Qwen2.5-Coder-32B-Instruct", {
+          method: "POST",
+          headers: { 
+            "Authorization": `Bearer ${import.meta.env.VITE_HF_TOKEN || ''}`,
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify({ 
+            inputs: `<|im_start|>system\n${systemPrompt}<|im_end|>\n<|im_start|>user\n${userPrompt}<|im_end|>\n<|im_start|>assistant\n`,
+            parameters: { max_new_tokens: 2000 }
+          })
+        });
+        
+        const data = await hfResponse.json();
+        html = data.generated_text || data[0]?.generated_text || "";
+        
+        if (html.includes("<|im_start|>assistant\n")) {
+          html = html.split("<|im_start|>assistant\n").pop().split("<|im_end|>")[0];
+        }
+      }
       
       if (html && html.length > 100) {
         let finalHtml = html;
