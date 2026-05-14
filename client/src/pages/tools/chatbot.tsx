@@ -79,27 +79,42 @@ export default function Chatbot() {
   }, [selectedBot]);
 
   const generateBotResponse = async (userMessage: string): Promise<string> => {
+    // Primary: Hugging Face Qwen2.5-Coder
     try {
-      const response = await fetch(`https://text.pollinations.ai/${encodeURIComponent(userMessage)}?system=${encodeURIComponent(selectedBot.systemPrompt)}`);
-      if (!response.ok) throw new Error('Pollinations AI failed');
-      const text = await response.text();
-      if (!text || text.length < 5) throw new Error('Response too short');
-      return text;
+      console.log("Trying Hugging Face (Qwen2.5-Coder)...");
+      const hfResponse = await fetch("https://api-inference.huggingface.co/models/Qwen/Qwen2.5-Coder-32B-Instruct", {
+        method: "POST",
+        headers: { 
+          "Authorization": `Bearer ${import.meta.env.VITE_HF_TOKEN || ''}`,
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({ 
+          inputs: `<|im_start|>system\n${selectedBot.systemPrompt}<|im_end|>\n<|im_start|>user\n${userMessage}<|im_end|>\n<|im_start|>assistant\n`,
+          parameters: { max_new_tokens: 1000 }
+        })
+      });
+      
+      const data = await hfResponse.json();
+      let result = data.generated_text || data[0]?.generated_text || "";
+      
+      // Clean up Qwen response if it includes the prompt
+      if (result.includes("<|im_start|>assistant\n")) {
+        result = result.split("<|im_start|>assistant\n").pop().split("<|im_end|>")[0];
+      }
+      
+      if (!result || result.length < 5) throw new Error('HF Response invalid');
+      return result;
+      
     } catch (error) {
-      console.log("Switching to HuggingFace fallback...");
+      console.log("Hugging Face failed, switching to Pollinations fallback...");
       try {
-        const hfResponse = await fetch("https://api-inference.huggingface.co/models/facebook/blenderbot-400M-distill", {
-          method: "POST",
-          headers: { 
-            "Authorization": `Bearer ${import.meta.env.VITE_HF_TOKEN || ''}`,
-            "Content-Type": "application/json"
-          },
-          body: JSON.stringify({ inputs: userMessage })
-        });
-        const data = await hfResponse.json();
-        return data.generated_text || data[0]?.generated_text || "I'm having trouble connecting to AI services right now.";
-      } catch (hfError) {
-        return "Both AI services are currently unavailable. Please try again later.";
+        const response = await fetch(`https://text.pollinations.ai/${encodeURIComponent(userMessage)}?system=${encodeURIComponent(selectedBot.systemPrompt)}`);
+        if (!response.ok) throw new Error('Pollinations AI failed');
+        const text = await response.text();
+        if (!text || text.length < 5) throw new Error('Response too short');
+        return text;
+      } catch (pollError) {
+        return "I'm having trouble connecting to AI services. Please check your internet or try again later.";
       }
     }
   };
