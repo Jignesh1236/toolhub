@@ -6,12 +6,12 @@ import { z } from "zod";
 
 const upload = multer({ 
   dest: 'uploads/',
-  limits: { fileSize: 10 * 1024 * 1024 } // 10MB limit
+  limits: { fileSize: 50 * 1024 * 1024 } // Increased to 50MB
 });
 
 const sharedUpload = multer({ 
   dest: 'shared_uploads/',
-  limits: { fileSize: 50 * 1024 * 1024 } // 50MB limit for shared files
+  limits: { fileSize: 100 * 1024 * 1024 } // Increased to 100MB
 });
 
 export async function registerRoutes(app: Express): Promise<Server> {
@@ -95,7 +95,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // File Sharing API (Database-backed)
-  app.post("/api/files", upload.single('file'), async (req, res) => {
+  app.post("/api/files", sharedUpload.single('file'), async (req, res) => {
     try {
       if (!req.file) return res.status(400).json({ error: "No file uploaded" });
       
@@ -137,7 +137,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const fs = await import('fs');
       const path = await import('path');
-      const filePath = path.join('uploads', file.filename);
+      const filePath = path.join('shared_uploads', file.filename);
 
       if (!fs.existsSync(filePath)) {
         return res.status(404).json({ error: "File not found on disk" });
