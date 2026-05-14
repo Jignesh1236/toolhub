@@ -3,7 +3,6 @@ import { Link } from "wouter";
 import { useState } from "react";
 
 interface ToolCardProps {
-  tool: Tool;
   onClick?: (tool: Tool) => void;
   onDelete?: (toolId: string) => void;
 }
