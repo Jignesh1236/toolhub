@@ -46,6 +46,7 @@ export const sharedFiles = pgTable("shared_files", {
   downloadCount: integer("download_count").default(0),
   maxDownloads: integer("max_downloads"),
   isPublic: boolean("is_public").default(true),
+  publicUrl: text("public_url"),
 });
 
 export const sharedTexts = pgTable("shared_texts", {

@@ -11,6 +11,11 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import QRCode from "qrcode";
+import { createClient } from '@supabase/supabase-js';
+
+const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
 interface SharedFile {
   id: string;
@@ -55,47 +60,44 @@ export default function FileShare() {
     setIsUploading(true);
     setUploadProgress(0);
 
-    const formData = new FormData();
-    formData.append("file", selectedFile);
-    
-    // tmpfiles.org uses 'expire' in seconds (60-86400)
-    // Default to 24 hours (86400 seconds)
-    const seconds = expiresIn ? Math.min(parseInt(expiresIn) * 3600, 86400) : 86400;
-    
     try {
-      const xhr = new XMLHttpRequest();
-      
-      // Track upload progress
-      xhr.upload.addEventListener("progress", (event) => {
-        if (event.lengthComputable) {
-          const percentComplete = Math.round((event.loaded / event.total) * 100);
-          setUploadProgress(percentComplete);
-        }
+      // 1. Upload file to Supabase Storage
+      const fileExt = selectedFile.name.split('.').pop();
+      const fileName = `${Math.random().toString(36).substring(2)}.${fileExt}`;
+      const filePath = `uploads/${fileName}`;
+
+      const { data: uploadData, error: uploadError } = await supabase.storage
+        .from('toolhub-files')
+        .upload(filePath, selectedFile, {
+          cacheControl: '3600',
+          upsert: false
+        });
+
+      if (uploadError) throw uploadError;
+
+      // 2. Get Public URL
+      const { data: { publicUrl } } = supabase.storage
+        .from('toolhub-files')
+        .getPublicUrl(filePath);
+
+      // 3. Save metadata to our DB
+      const response = await fetch("/api/files", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          originalName: selectedFile.name,
+          filename: fileName,
+          mimeType: selectedFile.type,
+          fileSize: selectedFile.size,
+          expiresIn: expiresIn,
+          publicUrl: publicUrl
+        })
       });
 
-      const uploadPromise = new Promise((resolve, reject) => {
-        xhr.onload = () => {
-          try {
-            const responseText = xhr.responseText;
-            if (xhr.status >= 200 && xhr.status < 300) {
-              resolve(JSON.parse(responseText));
-            } else {
-              const errorData = responseText ? JSON.parse(responseText) : { error: "Upload failed" };
-              reject(new Error(errorData.details || errorData.error || "Upload failed"));
-            }
-          } catch (e) {
-            reject(new Error("Invalid server response"));
-          }
-        };
-        xhr.onerror = () => reject(new Error("Network error or Server unreachable"));
-      });
+      if (!response.ok) throw new Error("Failed to save file metadata");
+      const savedFile = await response.json();
 
-      xhr.open("POST", "/api/files");
-      xhr.send(formData);
-
-      const response: any = await uploadPromise;
-      // Database response format
-      const internalShareUrl = `${window.location.origin}/download?id=${response.id}&name=${response.originalName}`;
+      const internalShareUrl = `${window.location.origin}/download?id=${savedFile.id}&name=${savedFile.originalName}`;
 
       toast({
         title: "✅ File uploaded successfully",
@@ -105,7 +107,6 @@ export default function FileShare() {
       setSelectedFile(null);
       setExpiresIn("24");
       
-      // Generate QR code for the internal share URL
       const qrCodeDataUrl = await QRCode.toDataURL(internalShareUrl, {
         width: 200,
         margin: 1,

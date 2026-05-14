@@ -95,28 +95,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // File Sharing API (Database-backed)
-  app.post("/api/files", sharedUpload.single('file'), async (req, res) => {
+  app.post("/api/files", async (req, res) => {
     try {
-      if (!req.file) return res.status(400).json({ error: "No file uploaded" });
-      
-      const { expiresIn } = req.body;
+      const { filename, originalName, mimeType, fileSize, expiresIn, maxDownloads, publicUrl } = req.body;
       const expiresAt = expiresIn ? new Date(Date.now() + parseInt(expiresIn) * 3600 * 1000) : null;
 
       const sharedFile = await storage.createSharedFile({
-        filename: req.file.filename,
-        originalName: req.file.originalname,
-        mimeType: req.file.mimetype,
-        fileSize: req.file.size,
+        filename,
+        originalName,
+        mimeType,
+        fileSize,
         expiresAt,
-        maxDownloads: req.body.maxDownloads ? parseInt(req.body.maxDownloads) : null,
-        isPublic: true
+        maxDownloads: maxDownloads ? parseInt(maxDownloads) : null,
+        isPublic: true,
+        publicUrl
       });
 
-      console.log("File saved to DB:", sharedFile);
+      console.log("File metadata saved to DB:", sharedFile);
       res.json(sharedFile);
     } catch (error) {
       console.error("File share error details:", error);
-      res.status(500).json({ error: "Failed to share file", details: error instanceof Error ? error.message : String(error) });
+      res.status(500).json({ error: "Failed to save file metadata", details: error instanceof Error ? error.message : String(error) });
     }
   });
 
@@ -134,6 +133,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const file = await storage.getSharedFile(req.params.id);
       if (!file) return res.status(404).json({ error: "File not found" });
+
+      if (file.publicUrl) {
+        return res.redirect(file.publicUrl);
+      }
 
       const fs = await import('fs');
       const path = await import('path');
