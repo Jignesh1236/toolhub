@@ -4,21 +4,11 @@ import { useState } from "react";
 
 interface ToolCardProps {
   tool: Tool;
-  onBookmark?: (toolId: string) => void;
   onClick?: (tool: Tool) => void;
   onDelete?: (toolId: string) => void;
 }
 
-export function ToolCard({ tool, onBookmark, onClick, onDelete }: ToolCardProps) {
-  const [isBookmarked, setIsBookmarked] = useState(tool.isBookmarked || false);
-
-  const handleBookmark = (e: React.MouseEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    setIsBookmarked(!isBookmarked);
-    onBookmark?.(tool.id);
-  };
-
+export function ToolCard({ tool, onClick, onDelete }: ToolCardProps) {
   const handleDelete = (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
@@ -70,34 +60,27 @@ export function ToolCard({ tool, onBookmark, onClick, onDelete }: ToolCardProps)
 
   return (
     <Link href={tool.route} data-testid={`tool-card-${tool.id}`} onClick={handleClick}>
-      <div className="bg-white dark:bg-dark-card rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6 hover:shadow-md hover:border-blue-300 dark:hover:border-blue-600 transition-all cursor-pointer group h-full flex flex-col">
-        <div className="flex items-start justify-between mb-4">
-          <div className={`p-3 rounded-lg transition-colors ${colorClasses[tool.color as keyof typeof colorClasses]}`}>
-            <i className={`${tool.icon} text-xl`}></i>
+      <div className="bg-white dark:bg-dark-card rounded-2xl border border-gray-100 dark:border-gray-800 p-6 shadow-sm card-hover-effect cursor-pointer group h-full flex flex-col">
+        <div className="flex items-start justify-between mb-5">
+          <div className={`p-4 rounded-2xl transition-all duration-300 group-hover:scale-110 ${colorClasses[tool.color as keyof typeof colorClasses]}`}>
+            <i className={`${tool.icon} text-2xl`}></i>
           </div>
           <div className="flex gap-2">
             {tool.isMagic && (
               <button 
                 onClick={handleDelete}
-                className="text-gray-400 hover:text-red-500 transition-colors"
+                className="p-2 rounded-full hover:bg-red-50 dark:hover:bg-red-950/30 text-gray-400 hover:text-red-500 transition-colors"
                 title="Delete tool"
               >
-                <i className="fas fa-trash-alt"></i>
+                <i className="fas fa-trash-alt text-sm"></i>
               </button>
             )}
-            <button 
-              onClick={handleBookmark}
-              className="text-gray-400 hover:text-yellow-500 transition-colors"
-              data-testid={`bookmark-${tool.id}`}
-            >
-              <i className={isBookmarked ? "fas fa-bookmark text-yellow-500" : "far fa-bookmark"}></i>
-            </button>
           </div>
         </div>
-        <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">{tool.name}</h3>
-        <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">{tool.description}</p>
-        <div className="flex items-center justify-between">
-          <span className={`text-xs px-2 py-1 rounded-full capitalize ${tagColors[tool.color as keyof typeof tagColors]}`}>
+        <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-2 group-hover:text-primary transition-colors">{tool.name}</h3>
+        <p className="text-sm text-gray-600 dark:text-gray-400 mb-6 line-clamp-2 leading-relaxed flex-grow">{tool.description}</p>
+        <div className="flex items-center justify-between mt-auto pt-4 border-t border-gray-50 dark:border-gray-800">
+          <span className={`text-[10px] font-bold tracking-wider uppercase px-3 py-1 rounded-full ${tagColors[tool.color as keyof typeof tagColors]}`}>
             {tool.category}
           </span>
           <i className="fas fa-arrow-right text-gray-400 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors"></i>

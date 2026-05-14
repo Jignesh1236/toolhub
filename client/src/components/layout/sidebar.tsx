@@ -73,13 +73,9 @@ export function Sidebar({ isOpen, onClose, activeCategory, onCategoryChange }: S
               <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Quick Access</p>
             </div>
             <div className="space-y-0.5">
-              <Link href="/bookmarks" className="flex items-center px-3 py-2 text-sm font-medium text-gray-600 dark:text-gray-400 rounded-md hover:bg-white dark:hover:bg-gray-800 hover:text-gray-900 dark:hover:text-gray-200 transition-colors">
-                <i className="fas fa-bookmark w-4 h-4 mr-3 flex-shrink-0"></i>
-                <span className="truncate">Bookmarked</span>
-              </Link>
               <Link href="/recent" className="flex items-center px-3 py-2 text-sm font-medium text-gray-600 dark:text-gray-400 rounded-md hover:bg-white dark:hover:bg-gray-800 hover:text-gray-900 dark:hover:text-gray-200 transition-colors">
                 <i className="fas fa-history w-4 h-4 mr-3 flex-shrink-0"></i>
-                <span className="truncate">Recent</span>
+                <span className="truncate">Recently Used</span>
               </Link>
             </div>
           </div>

@@ -4,7 +4,7 @@ import { Header } from "@/components/layout/header";
 import { ToolCard } from "@/components/tool-card";
 import { tools, getToolsByCategory, searchTools, toolCategories } from "@/lib/tools";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
 import { useLocation } from "wouter";
 
@@ -235,17 +235,80 @@ export default function Dashboard() {
             </div>
           )}
 
+          {/* Recently Used Shared Files & Texts */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-12">
+        {/* Recently Used Tools (Horizontal Scroll or List) */}
+        <Card className="card-hover-effect border-none shadow-md overflow-hidden bg-gradient-to-br from-white to-blue-50 dark:from-dark-card dark:to-blue-900/10">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-lg flex items-center gap-2">
+              <i className="fas fa-history text-blue-500"></i>
+              Recently Used Tools
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="flex gap-4 overflow-x-auto pb-2 scrollbar-hide">
+              {/* This would be populated from tool usage history */}
+              <div className="flex flex-col items-center gap-2 min-w-[80px]">
+                <div className="w-12 h-12 rounded-full bg-white dark:bg-gray-800 flex items-center justify-center shadow-sm">
+                  <i className="fas fa-file-pdf text-red-500"></i>
+                </div>
+                <span className="text-[10px] font-medium">PDF Merger</span>
+              </div>
+              <div className="flex flex-col items-center gap-2 min-w-[80px]">
+                <div className="w-12 h-12 rounded-full bg-white dark:bg-gray-800 flex items-center justify-center shadow-sm">
+                  <i className="fas fa-robot text-blue-500"></i>
+                </div>
+                <span className="text-[10px] font-medium">Chatbot</span>
+              </div>
+              <div className="flex flex-col items-center gap-2 min-w-[80px]">
+                <div className="w-12 h-12 rounded-full bg-white dark:bg-gray-800 flex items-center justify-center shadow-sm">
+                  <i className="fas fa-share-alt text-green-500"></i>
+                </div>
+                <span className="text-[10px] font-medium">File Share</span>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Recently Used Magic Tools */}
+        <Card className="card-hover-effect border-none shadow-md overflow-hidden bg-gradient-to-br from-white to-purple-50 dark:from-dark-card dark:to-purple-900/10">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-lg flex items-center gap-2">
+              <i className="fas fa-magic text-purple-500"></i>
+              Recent Magic Tools
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="flex gap-4 overflow-x-auto pb-2 scrollbar-hide">
+              {magicTools.slice(0, 3).map((tool) => (
+                <div key={tool.name} className="flex flex-col items-center gap-2 min-w-[80px] cursor-pointer" onClick={() => setLocation(`/magic/${encodeURIComponent(tool.name)}`)}>
+                  <div className="w-12 h-12 rounded-full bg-white dark:bg-gray-800 flex items-center justify-center shadow-sm">
+                    <i className="fas fa-wand-sparkles text-purple-500"></i>
+                  </div>
+                  <span className="text-[10px] font-medium truncate w-full text-center">{tool.name}</span>
+                </div>
+              ))}
+              {magicTools.length === 0 && (
+                <p className="text-xs text-muted-foreground py-2">No magic tools created yet</p>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
           {/* Tools Grid */}
           <div className="mb-6">
-            <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-4" data-testid="category-title">
-              {categoryTitle}
-            </h2>
+            <div className="flex items-center justify-between mb-8">
+              <h2 className="text-2xl font-bold text-gray-900 dark:text-white flex items-center gap-3">
+                <span className="w-2 h-8 bg-primary rounded-full"></span>
+                {searchQuery ? `Search Results for "${searchQuery}"` : activeCategory === 'all' ? 'All Tools' : toolCategories.find(c => c.id === activeCategory)?.name}
+              </h2>
+            </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6" data-testid="tools-grid">
               {displayedTools.map((tool) => (
                 <ToolCard 
                   key={tool.id} 
                   tool={tool} 
-                  onBookmark={() => {}} 
                   onDelete={handleDeleteMagicTool}
                 />
               ))}

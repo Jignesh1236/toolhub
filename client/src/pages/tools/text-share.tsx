@@ -11,6 +11,21 @@ import { queryClient, apiRequest } from "@/lib/queryClient";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import QRCode from "qrcode";
+import { createClient } from '@supabase/supabase-js';
+
+const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || '';
+const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || '';
+const supabase = (supabaseUrl && supabaseAnonKey) ? createClient(supabaseUrl, supabaseAnonKey) : null;
+
+async function fetchSharedTexts() {
+  if (!supabase) return [];
+  const { data, error } = await supabase
+    .from('shared_texts')
+    .select('*')
+    .order('uploadedAt', { ascending: false });
+  if (error) throw error;
+  return data || [];
+}
 
 interface SharedText {
   id: string;
@@ -32,15 +47,32 @@ export default function TextShare() {
   const [isUploading, setIsUploading] = useState(false);
   const { toast } = useToast();
 
+  const { data: sharedTexts, isLoading, refetch } = useQuery<SharedText[]>({
+    queryKey: ["/api/texts"],
+    queryFn: fetchSharedTexts,
+    refetchInterval: 5000,
+  });
+
   const uploadMutation = useMutation({
     mutationFn: async (data: { title: string; content: string; expiresIn?: string; maxDownloads?: string }) => {
-      const response = await apiRequest("POST", "/api/texts", {
-        title: data.title,
-        content: data.content,
-        expiresIn: data.expiresIn,
-        maxDownloads: data.maxDownloads
-      });
-      return response.json();
+      if (!supabase) throw new Error("Supabase not initialized");
+      
+      const expiresAt = data.expiresIn ? new Date(Date.now() + parseInt(data.expiresIn) * 3600 * 1000).toISOString() : null;
+      
+      const { data: savedText, error } = await supabase
+        .from('shared_texts')
+        .insert([{
+          title: data.title,
+          content: data.content,
+          expiresAt: expiresAt,
+          maxDownloads: data.maxDownloads ? parseInt(data.maxDownloads) : null,
+          isPublic: true
+        }])
+        .select()
+        .single();
+
+      if (error) throw error;
+      return savedText;
     },
     onSuccess: async (data) => {
       toast({
@@ -48,6 +80,7 @@ export default function TextShare() {
         description: `Your text is now available for sharing. Expiring in ${expiresIn || '24'} hours.`,
       });
       
+      refetch();
       const internalShareUrl = `${window.location.origin}/download-text?id=${data.id}`;
       
       // Generate QR code for the internal share URL
@@ -288,6 +321,81 @@ export default function TextShare() {
               </p>
             </CardContent>
           </Card>
+        )}
+      </div>
+
+      {/* Shared Texts List */}
+      <div className="mt-12">
+        <h2 className="text-2xl font-bold mb-6 flex items-center gap-2">
+          <Share2 className="h-6 w-6" />
+          Recently Shared Texts
+        </h2>
+        
+        {isLoading ? (
+          <div className="flex justify-center py-12">
+            <RefreshCw className="h-8 w-8 animate-spin text-primary" />
+          </div>
+        ) : sharedTexts && sharedTexts.length > 0 ? (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {sharedTexts.map((text) => (
+              <Card key={text.id} className="overflow-hidden">
+                <CardContent className="p-0">
+                  <div className="p-4 bg-muted/50 flex items-start gap-4">
+                    <div className="p-2 bg-blue-500/10 rounded-lg">
+                      <Type className="h-6 w-6 text-blue-500" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="font-medium truncate" title={text.title}>
+                        {text.title}
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        {new Date(text.uploadedAt || (text as any).uploaded_at).toLocaleDateString()}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="p-4 space-y-3">
+                    <div className="flex items-center justify-between text-xs">
+                      <div className="flex items-center gap-1 text-muted-foreground">
+                        <Clock className="h-3 w-3" />
+                        <span>Expires: {text.expiresAt || (text as any).expires_at ? new Date(text.expiresAt || (text as any).expires_at).toLocaleTimeString() : '24h'}</span>
+                      </div>
+                      <Badge variant="outline" className="text-[10px]">
+                        {text.downloadCount || (text as any).download_count || 0} views
+                      </Badge>
+                    </div>
+                    <div className="flex gap-2">
+                      <Button 
+                        variant="outline" 
+                        size="sm" 
+                        className="flex-1"
+                        onClick={() => {
+                          const url = `${window.location.origin}/download-text?id=${text.id}`;
+                          navigator.clipboard.writeText(url);
+                          toast({ title: "✅ Copied", description: "Link copied to clipboard" });
+                        }}
+                      >
+                        <Link2 className="h-3 w-3 mr-1" />
+                        Link
+                      </Button>
+                      <Button 
+                        variant="primary" 
+                        size="sm" 
+                        className="flex-1"
+                        onClick={() => window.open(`${window.location.origin}/download-text?id=${text.id}`, '_blank')}
+                      >
+                        <Eye className="h-3 w-3 mr-1" />
+                        View
+                      </Button>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        ) : (
+          <div className="text-center py-12 bg-muted/30 rounded-lg border-2 border-dashed">
+            <p className="text-muted-foreground">No texts shared yet. Be the first to share!</p>
+          </div>
         )}
       </div>
     </div>
