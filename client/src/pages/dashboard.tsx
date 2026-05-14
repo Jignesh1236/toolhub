@@ -60,27 +60,38 @@ export default function Dashboard() {
   const handleSeeMagic = async () => {
     setIsGenerating(true);
     try {
-      const prompt = `Create a high-quality, professional-grade, and detailed single-file HTML tool for "${searchQuery}". 
+      const systemPrompt = `Create a high-quality, professional-grade, and detailed single-file HTML tool. 
       Requirements:
       1. Modern and beautiful UI using Tailwind CSS.
-      2. Comprehensive features related to "${searchQuery}".
+      2. Comprehensive features.
       3. Mobile-responsive design.
       4. Interactive elements with polished JavaScript.
       5. Dark mode support.
-      6. Clear instructions and professional layout.
-      Return ONLY the complete HTML code. No talk, just code.`;
+      Return ONLY the complete HTML code starting with <!DOCTYPE html>. No talk, just code.`;
       
-      const response = await fetch(`https://text.pollinations.ai/${encodeURIComponent(prompt)}`);
+      const userPrompt = `Generate a fully functional tool for "${searchQuery}".`;
+      
+      // Using a simpler URL structure for better reliability
+      const response = await fetch(`https://text.pollinations.ai/${encodeURIComponent(userPrompt)}?system=${encodeURIComponent(systemPrompt)}&seed=${Math.floor(Math.random() * 1000)}`);
       const html = await response.text();
       
-      if (html) {
-        setMagicTools(prev => [...prev, { name: searchQuery, html }]);
+      if (html && (html.includes('<!DOCTYPE html>') || html.includes('<html'))) {
+        let finalHtml = html;
+        // Clean up markdown code blocks if AI wrapped them
+        if (finalHtml.includes('```html')) {
+          finalHtml = finalHtml.split('```html')[1].split('```')[0].trim();
+        } else if (finalHtml.includes('```')) {
+          finalHtml = finalHtml.split('```')[1].split('```')[0].trim();
+        }
+
+        setMagicTools(prev => [...prev, { name: searchQuery, html: finalHtml }]);
         toast({
            title: "✨ Magic happened!",
            description: `A new tool for "${searchQuery}" has been created. Opening now...`,
          });
-         // Redirect to the new tool immediately
          setLocation(`/magic/${encodeURIComponent(searchQuery)}`);
+       } else {
+         throw new Error("Invalid response from AI");
        }
     } catch (error) {
       console.error("Magic failed:", error);
@@ -206,95 +217,108 @@ export default function Dashboard() {
             </Card>
           </div>
 
-          {/* Recently Used Tools */}
-          {!searchQuery && activeCategory === 'all' && (
-            <div className="mb-8">
-              <div className="flex items-center justify-between mb-4">
-                <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Recently Used</h2>
-                <Button variant="link" className="text-sm text-blue-600 dark:text-blue-400 hover:text-blue-500 font-medium">
-                  View all
-                </Button>
-              </div>
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                {recentTools.map((tool) => (
-                  <Card key={tool.id} className="bg-white dark:bg-dark-card hover:shadow-md transition-shadow cursor-pointer">
-                    <CardContent className="p-4">
-                      <div className="flex items-center space-x-3">
-                        <div className={`p-2 rounded-lg bg-${tool.color}-50 dark:bg-${tool.color}-900/20`}>
-                          <i className={`${tool.icon} text-${tool.color}-600 dark:text-${tool.color}-400`}></i>
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <p className="text-sm font-medium text-gray-900 dark:text-white truncate">{tool.name}</p>
-                          <p className="text-xs text-gray-500 dark:text-gray-400">Never used</p>
-                        </div>
-                      </div>
-                    </CardContent>
-                  </Card>
-                ))}
-              </div>
+          {/* Recently Used Section */}
+          <div className="mb-12">
+            <div className="flex items-center justify-between mb-6">
+              <h2 className="text-2xl font-bold text-gray-900 dark:text-white flex items-center gap-3">
+                <span className="w-2 h-8 bg-primary rounded-full"></span>
+                Recently Used
+              </h2>
+              <Button variant="link" className="text-blue-600 dark:text-blue-400 font-medium">
+                View all
+              </Button>
             </div>
-          )}
-
-          {/* Recently Used Shared Files & Texts */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-12">
-        {/* Recently Used Tools (Horizontal Scroll or List) */}
-        <Card className="card-hover-effect border-none shadow-md overflow-hidden bg-gradient-to-br from-white to-blue-50 dark:from-dark-card dark:to-blue-900/10">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-lg flex items-center gap-2">
-              <i className="fas fa-history text-blue-500"></i>
-              Recently Used Tools
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="flex gap-4 overflow-x-auto pb-2 scrollbar-hide">
-              {/* This would be populated from tool usage history */}
-              <div className="flex flex-col items-center gap-2 min-w-[80px]">
-                <div className="w-12 h-12 rounded-full bg-white dark:bg-gray-800 flex items-center justify-center shadow-sm">
-                  <i className="fas fa-file-pdf text-red-500"></i>
-                </div>
-                <span className="text-[10px] font-medium">PDF Merger</span>
-              </div>
-              <div className="flex flex-col items-center gap-2 min-w-[80px]">
-                <div className="w-12 h-12 rounded-full bg-white dark:bg-gray-800 flex items-center justify-center shadow-sm">
-                  <i className="fas fa-robot text-blue-500"></i>
-                </div>
-                <span className="text-[10px] font-medium">Chatbot</span>
-              </div>
-              <div className="flex flex-col items-center gap-2 min-w-[80px]">
-                <div className="w-12 h-12 rounded-full bg-white dark:bg-gray-800 flex items-center justify-center shadow-sm">
-                  <i className="fas fa-share-alt text-green-500"></i>
-                </div>
-                <span className="text-[10px] font-medium">File Share</span>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Recently Used Magic Tools */}
-        <Card className="card-hover-effect border-none shadow-md overflow-hidden bg-gradient-to-br from-white to-purple-50 dark:from-dark-card dark:to-purple-900/10">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-lg flex items-center gap-2">
-              <i className="fas fa-magic text-purple-500"></i>
-              Recent Magic Tools
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="flex gap-4 overflow-x-auto pb-2 scrollbar-hide">
-              {magicTools.slice(0, 3).map((tool) => (
-                <div key={tool.name} className="flex flex-col items-center gap-2 min-w-[80px] cursor-pointer" onClick={() => setLocation(`/magic/${encodeURIComponent(tool.name)}`)}>
-                  <div className="w-12 h-12 rounded-full bg-white dark:bg-gray-800 flex items-center justify-center shadow-sm">
-                    <i className="fas fa-wand-sparkles text-purple-500"></i>
+            
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+              {/* File Share Quick Access */}
+              <Card 
+                className="card-hover-effect cursor-pointer border-none shadow-md bg-white dark:bg-dark-card"
+                onClick={() => setLocation('/tools/file-share')}
+              >
+                <CardContent className="p-5">
+                  <div className="flex items-center space-x-4">
+                    <div className="p-3 rounded-xl bg-blue-50 dark:bg-blue-900/20">
+                      <i className="fas fa-file-alt text-blue-600 dark:text-blue-400 text-xl"></i>
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-bold text-gray-900 dark:text-white truncate">File Share</p>
+                      <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">Quickly share files</p>
+                    </div>
                   </div>
-                  <span className="text-[10px] font-medium truncate w-full text-center">{tool.name}</span>
-                </div>
-              ))}
-              {magicTools.length === 0 && (
-                <p className="text-xs text-muted-foreground py-2">No magic tools created yet</p>
+                </CardContent>
+              </Card>
+
+              {/* Text Share Quick Access */}
+              <Card 
+                className="card-hover-effect cursor-pointer border-none shadow-md bg-white dark:bg-dark-card"
+                onClick={() => setLocation('/tools/text-share')}
+              >
+                <CardContent className="p-5">
+                  <div className="flex items-center space-x-4">
+                    <div className="p-3 rounded-xl bg-purple-50 dark:bg-purple-900/20">
+                      <i className="fas fa-quote-left text-purple-600 dark:text-purple-400 text-xl"></i>
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-bold text-gray-900 dark:text-white truncate">Text Share</p>
+                      <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">Share text snippets</p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Magic Tool Placeholder 1 */}
+              {magicTools.length > 0 ? (
+                <Card 
+                  className="card-hover-effect cursor-pointer border-none shadow-md bg-white dark:bg-dark-card"
+                  onClick={() => setLocation(`/magic/${encodeURIComponent(magicTools[0].name)}`)}
+                >
+                  <CardContent className="p-5">
+                    <div className="flex items-center space-x-4">
+                      <div className="p-3 rounded-xl bg-orange-50 dark:bg-orange-900/20">
+                        <i className="fas fa-magic text-orange-600 dark:text-orange-400 text-xl"></i>
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-bold text-gray-900 dark:text-white truncate">{magicTools[0].name}</p>
+                        <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">AI Generated Tool</p>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              ) : (
+                <Card className="border-none shadow-md bg-white dark:bg-dark-card opacity-60">
+                  <CardContent className="p-5">
+                    <div className="flex items-center space-x-4">
+                      <div className="p-3 rounded-xl bg-gray-50 dark:bg-gray-800">
+                        <i className="fas fa-wand-sparkles text-gray-400 text-xl"></i>
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-bold text-gray-400 truncate">No Magic Tool</p>
+                        <p className="text-xs text-gray-500">Create with AI</p>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
               )}
+
+              {/* Chatbot Quick Access */}
+              <Card 
+                className="card-hover-effect cursor-pointer border-none shadow-md bg-white dark:bg-dark-card"
+                onClick={() => setLocation('/tools/chatbot')}
+              >
+                <CardContent className="p-5">
+                  <div className="flex items-center space-x-4">
+                    <div className="p-3 rounded-xl bg-green-50 dark:bg-green-900/20">
+                      <i className="fas fa-robot text-green-600 dark:text-green-400 text-xl"></i>
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-bold text-gray-900 dark:text-white truncate">AI Chatbot</p>
+                      <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">Talk with Qwen</p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
             </div>
-          </CardContent>
-        </Card>
-      </div>
+          </div>
 
           {/* Tools Grid */}
           <div className="mb-6">
