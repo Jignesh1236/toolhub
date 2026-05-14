@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Upload, Share2, Download, Trash2, Clock, Eye, Link2, QrCode, RefreshCw } from "lucide-react";
+import { Upload, Share2, Download, Trash2, Clock, Eye, Link2, QrCode, RefreshCw, FileText } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
@@ -20,6 +20,12 @@ const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || '';
 const supabase = (supabaseUrl && supabaseAnonKey) 
   ? createClient(supabaseUrl, supabaseAnonKey) 
   : null;
+
+async function fetchSharedFiles() {
+  const res = await fetch("/api/files");
+  if (!res.ok) throw new Error("Failed to fetch files");
+  return res.json();
+}
 
 interface SharedFile {
   id: string;
@@ -43,6 +49,12 @@ export default function FileShare() {
   const [isUploading, setIsUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
   const { toast } = useToast();
+
+  const { data: sharedFiles, isLoading, refetch } = useQuery<SharedFile[]>({
+    queryKey: ["/api/files"],
+    queryFn: fetchSharedFiles,
+    refetchInterval: 5000, // Refresh every 5 seconds
+  });
 
   const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -104,6 +116,8 @@ export default function FileShare() {
 
       if (!response.ok) throw new Error("Failed to save file metadata");
       const savedFile = await response.json();
+
+      refetch();
 
       const internalShareUrl = `${window.location.origin}/download?id=${savedFile.id}&name=${savedFile.originalName}`;
 
@@ -343,6 +357,80 @@ export default function FileShare() {
               </div>
             </CardContent>
           </Card>
+        )}
+      </div>
+
+      {/* Shared Files List */}
+      <div className="mt-12">
+        <h2 className="text-2xl font-bold mb-6 flex items-center gap-2">
+          <Share2 className="h-6 w-6" />
+          Recently Shared Files
+        </h2>
+        
+        {isLoading ? (
+          <div className="flex justify-center py-12">
+            <RefreshCw className="h-8 w-8 animate-spin text-primary" />
+          </div>
+        ) : sharedFiles && sharedFiles.length > 0 ? (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {sharedFiles.map((file) => (
+              <Card key={file.id} className="overflow-hidden">
+                <CardContent className="p-0">
+                  <div className="p-4 bg-muted/50 flex items-start gap-4">
+                    <div className="p-2 bg-primary/10 rounded-lg">
+                      <FileText className="h-6 w-6 text-primary" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="font-medium truncate" title={file.originalName}>
+                        {file.originalName}
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        {formatFileSize(file.fileSize)} • {new Date(file.uploadedAt).toLocaleDateString()}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="p-4 space-y-3">
+                    <div className="flex items-center justify-between text-xs">
+                      <div className="flex items-center gap-1 text-muted-foreground">
+                        <Clock className="h-3 w-3" />
+                        <span>Expires: {file.expiresAt ? new Date(file.expiresAt).toLocaleTimeString() : '24h'}</span>
+                      </div>
+                      <Badge variant="outline" className="text-[10px]">
+                        {file.downloadCount} downloads
+                      </Badge>
+                    </div>
+                    <div className="flex gap-2">
+                      <Button 
+                        variant="outline" 
+                        size="sm" 
+                        className="flex-1"
+                        onClick={() => {
+                          const url = `${window.location.origin}/download?id=${file.id}&name=${file.originalName}`;
+                          copyToClipboard(url);
+                        }}
+                      >
+                        <Link2 className="h-3 w-3 mr-1" />
+                        Link
+                      </Button>
+                      <Button 
+                        variant="primary" 
+                        size="sm" 
+                        className="flex-1"
+                        onClick={() => window.open(`${window.location.origin}/download?id=${file.id}&name=${file.originalName}`, '_blank')}
+                      >
+                        <Download className="h-3 w-3 mr-1" />
+                        Download
+                      </Button>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        ) : (
+          <div className="text-center py-12 bg-muted/30 rounded-lg border-2 border-dashed">
+            <p className="text-muted-foreground">No files shared yet. Be the first to share!</p>
+          </div>
         )}
       </div>
     </div>

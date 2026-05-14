@@ -95,6 +95,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // File Sharing API (Database-backed)
+  app.get("/api/files", async (req, res) => {
+    try {
+      const files = await storage.getAllSharedFiles();
+      res.json(files);
+    } catch (error) {
+      console.error("Get shared files error:", error);
+      res.status(500).json({ error: "Failed to get shared files" });
+    }
+  });
+
   app.post("/api/files", async (req, res) => {
     try {
       const { filename, originalName, mimeType, fileSize, expiresIn, maxDownloads, publicUrl } = req.body;

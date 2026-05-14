@@ -28,6 +28,7 @@ export interface IStorage {
   getSharedFile(id: string): Promise<SharedFile | undefined>;
   createSharedText(text: InsertSharedText): Promise<SharedText>;
   getSharedText(id: string): Promise<SharedText | undefined>;
+  getAllSharedFiles(): Promise<SharedFile[]>;
   cleanupExpiredContent(): Promise<void>;
 }
 
@@ -126,6 +127,10 @@ export class DatabaseStorage implements IStorage {
   async getSharedText(id: string): Promise<SharedText | undefined> {
     const [text] = await db.select().from(sharedTexts).where(eq(sharedTexts.id, id));
     return text;
+  }
+
+  async getAllSharedFiles(): Promise<SharedFile[]> {
+    return await db.select().from(sharedFiles).orderBy(sql`${sharedFiles.uploadedAt} DESC`);
   }
 
   async cleanupExpiredContent(): Promise<void> {
