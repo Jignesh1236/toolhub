@@ -13,9 +13,13 @@ import { Progress } from "@/components/ui/progress";
 import QRCode from "qrcode";
 import { createClient } from '@supabase/supabase-js';
 
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
-const supabase = createClient(supabaseUrl, supabaseAnonKey);
+const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || '';
+const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || '';
+
+// Initialize client only if credentials exist to prevent white screen crash
+const supabase = (supabaseUrl && supabaseAnonKey) 
+  ? createClient(supabaseUrl, supabaseAnonKey) 
+  : null;
 
 interface SharedFile {
   id: string;
@@ -61,6 +65,10 @@ export default function FileShare() {
     setUploadProgress(0);
 
     try {
+      if (!supabase) {
+        throw new Error("Supabase credentials missing. Please check your environment variables.");
+      }
+
       // 1. Upload file to Supabase Storage
       const fileExt = selectedFile.name.split('.').pop();
       const fileName = `${Math.random().toString(36).substring(2)}.${fileExt}`;
