@@ -79,52 +79,29 @@ export default function Chatbot() {
   }, [selectedBot]);
 
   const generateBotResponse = async (userMessage: string): Promise<string> => {
-    // Simulate bot thinking time
-    await new Promise(resolve => setTimeout(resolve, 1000 + Math.random() * 2000));
-
-    // Simple response generation based on keywords and bot personality
-    const lowerMessage = userMessage.toLowerCase();
-    
-    if (selectedBot.name === "Teacher") {
-      if (lowerMessage.includes('what') || lowerMessage.includes('how') || lowerMessage.includes('why')) {
-        return `Great question! Let me explain that step by step. ${generateEducationalResponse(userMessage)}`;
+    try {
+      const response = await fetch(`https://text.pollinations.ai/${encodeURIComponent(userMessage)}?system=${encodeURIComponent(selectedBot.systemPrompt)}`);
+      if (!response.ok) throw new Error('Pollinations AI failed');
+      const text = await response.text();
+      if (!text || text.length < 5) throw new Error('Response too short');
+      return text;
+    } catch (error) {
+      console.log("Switching to HuggingFace fallback...");
+      try {
+        const hfResponse = await fetch("https://api-inference.huggingface.co/models/facebook/blenderbot-400M-distill", {
+          method: "POST",
+          headers: { 
+            "Authorization": `Bearer ${import.meta.env.VITE_HF_TOKEN || ''}`,
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify({ inputs: userMessage })
+        });
+        const data = await hfResponse.json();
+        return data.generated_text || data[0]?.generated_text || "I'm having trouble connecting to AI services right now.";
+      } catch (hfError) {
+        return "Both AI services are currently unavailable. Please try again later.";
       }
-      return `That's an interesting topic to explore. Let's break it down together. ${generateEducationalResponse(userMessage)}`;
     }
-    
-    if (selectedBot.name === "Therapist") {
-      if (lowerMessage.includes('sad') || lowerMessage.includes('angry') || lowerMessage.includes('upset')) {
-        return `I hear that you're experiencing some difficult emotions. It's completely normal to feel this way sometimes. Would you like to talk more about what's contributing to these feelings?`;
-      }
-      return `Thank you for sharing that with me. I'm here to listen and support you. How are you feeling about this situation?`;
-    }
-    
-    if (selectedBot.name === "Comedian") {
-      return `${generateFunnyResponse(userMessage)} 😄 But seriously, ${generateHelpfulResponse(userMessage)}`;
-    }
-    
-    if (selectedBot.name === "Expert") {
-      return `From a technical perspective, ${generateTechnicalResponse(userMessage)}. Would you like me to elaborate on any specific aspect?`;
-    }
-    
-    // Default Assistant responses
-    if (lowerMessage.includes('hello') || lowerMessage.includes('hi')) {
-      return "Hello! How can I assist you today?";
-    }
-    
-    if (lowerMessage.includes('help')) {
-      return "I'm here to help! You can ask me questions, have a conversation, or request assistance with various topics.";
-    }
-    
-    if (lowerMessage.includes('weather')) {
-      return "I don't have access to real-time weather data, but I'd recommend checking a weather app or website for current conditions in your area.";
-    }
-    
-    if (lowerMessage.includes('time')) {
-      return `The current time is ${new Date().toLocaleTimeString()}.`;
-    }
-    
-    return generateHelpfulResponse(userMessage);
   };
 
   const generateEducationalResponse = (message: string): string => {
