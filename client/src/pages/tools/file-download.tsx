@@ -4,18 +4,49 @@ import { Button } from "@/components/ui/button";
 import { Download, File as FileIcon, Clock, ShieldCheck } from "lucide-react";
 import { useEffect, useState } from "react";
 
+import { createClient } from '@supabase/supabase-js';
+
+const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || '';
+const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || '';
+const supabase = (supabaseUrl && supabaseAnonKey) ? createClient(supabaseUrl, supabaseAnonKey) : null;
+
 export default function FileDownload() {
   const [location] = useLocation();
-  const [fileData, setFileData] = useState<{ id: string; name: string } | null>(null);
+  const [fileData, setFileData] = useState<{ id: string; name: string; publicUrl?: string } | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const id = params.get("id");
-    const name = params.get("name");
-    if (id && name) {
-      setFileData({ id, name });
+    
+    if (id && supabase) {
+      supabase
+        .from('shared_files')
+        .select('*')
+        .eq('id', id)
+        .single()
+        .then(({ data, error }) => {
+          if (data && !error) {
+            setFileData({ 
+              id: data.id, 
+              name: data.originalName || data.original_name, 
+              publicUrl: data.publicUrl || data.public_url 
+            });
+          }
+          setIsLoading(false);
+        });
+    } else {
+      setIsLoading(false);
     }
   }, [location]);
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <RefreshCw className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    );
+  }
 
   if (!fileData) {
     return (
@@ -25,7 +56,11 @@ export default function FileDownload() {
     );
   }
 
-  const directDownloadUrl = `/api/files/${fileData.id}/download`;
+  const handleDownload = () => {
+    if (fileData.publicUrl) {
+      window.open(fileData.publicUrl, '_blank');
+    }
+  };
 
   return (
     <div className="container mx-auto px-4 py-12 max-w-2xl">
@@ -57,17 +92,18 @@ export default function FileDownload() {
 
           <Button 
             className="w-full h-12 text-lg" 
-            onClick={() => window.location.href = directDownloadUrl}
+            onClick={handleDownload}
           >
             <Download className="mr-2 h-5 w-5" />
             Download Now
           </Button>
 
           <p className="text-xs text-muted-foreground">
-            Note: This file is hosted externally and will be automatically deleted after the set time.
+            Note: This file is hosted on Supabase and will be automatically deleted after the set time.
           </p>
         </CardContent>
       </Card>
     </div>
   );
 }
+

@@ -22,9 +22,17 @@ const supabase = (supabaseUrl && supabaseAnonKey)
   : null;
 
 async function fetchSharedFiles() {
-  const res = await fetch("/api/files");
-  if (!res.ok) throw new Error("Failed to fetch files");
-  return res.json();
+  if (!supabase) return [];
+  const { data, error } = await supabase
+    .from('shared_files')
+    .select('*')
+    .order('uploaded_at', { ascending: false });
+  
+  if (error) {
+    console.error("Supabase fetch error:", error);
+    throw error;
+  }
+  return data || [];
 }
 
 interface SharedFile {
@@ -100,22 +108,21 @@ export default function FileShare() {
         .from('toolhub-files')
         .getPublicUrl(filePath);
 
-      // 3. Save metadata to our DB
-      const response = await fetch("/api/files", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
+      // 3. Save metadata directly to Supabase Database
+      const { data: savedFile, error: dbError } = await supabase
+        .from('shared_files')
+        .insert([{
           originalName: selectedFile.name,
           filename: fileName,
           mimeType: selectedFile.type,
           fileSize: selectedFile.size,
-          expiresIn: expiresIn,
+          expires_at: expiresIn ? new Date(Date.now() + parseInt(expiresIn) * 3600 * 1000).toISOString() : null,
           publicUrl: publicUrl
-        })
-      });
+        }])
+        .select()
+        .single();
 
-      if (!response.ok) throw new Error("Failed to save file metadata");
-      const savedFile = await response.json();
+      if (dbError) throw dbError;
 
       refetch();
 
@@ -385,7 +392,7 @@ export default function FileShare() {
                         {file.originalName}
                       </p>
                       <p className="text-xs text-muted-foreground">
-                        {formatFileSize(file.fileSize)} • {new Date(file.uploadedAt).toLocaleDateString()}
+                        {formatFileSize(file.fileSize)} • {new Date(file.uploadedAt || (file as any).uploaded_at).toLocaleDateString()}
                       </p>
                     </div>
                   </div>
@@ -393,10 +400,10 @@ export default function FileShare() {
                     <div className="flex items-center justify-between text-xs">
                       <div className="flex items-center gap-1 text-muted-foreground">
                         <Clock className="h-3 w-3" />
-                        <span>Expires: {file.expiresAt ? new Date(file.expiresAt).toLocaleTimeString() : '24h'}</span>
+                        <span>Expires: {file.expiresAt || (file as any).expires_at ? new Date(file.expiresAt || (file as any).expires_at).toLocaleTimeString() : '24h'}</span>
                       </div>
                       <Badge variant="outline" className="text-[10px]">
-                        {file.downloadCount} downloads
+                        {file.downloadCount || (file as any).download_count || 0} downloads
                       </Badge>
                     </div>
                     <div className="flex gap-2">
