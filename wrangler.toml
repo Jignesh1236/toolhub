@@ -1,0 +1,10 @@
+#:schema node_modules/wrangler/config-schema.json
+name = "toolhub"
+compatibility_date = "2026-05-14"
+pages_build_output_dir = "dist/public"
+
+[vars]
+# VITE_HF_TOKEN = "your_token_here" (Set this in Cloudflare Dashboard instead)
+
+[build]
+command = "npm run build:frontend"
