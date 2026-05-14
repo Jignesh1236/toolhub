@@ -7,18 +7,28 @@ export default function MagicToolView() {
   const [, params] = useRoute("/magic/:name");
   const [, setLocation] = useLocation();
   const [html, setHtml] = useState<string | null>(null);
-  const toolName = params ? decodeURIComponent(params.name) : "";
+  const rawName = params?.name || "";
+  const toolName = decodeURIComponent(rawName);
 
   useEffect(() => {
-    const saved = localStorage.getItem('magic_tools');
-    if (saved) {
-      const magicTools = JSON.parse(saved);
-      const tool = magicTools.find((t: any) => t.name === toolName);
-      if (tool) {
-        setHtml(tool.html);
+    const loadTool = () => {
+      const saved = localStorage.getItem('magic_tools');
+      if (saved) {
+        const magicTools = JSON.parse(saved);
+        // Try finding by decoded name or raw name just in case
+        const tool = magicTools.find((t: any) => t.name === toolName || t.name === rawName);
+        if (tool) {
+          setHtml(tool.html);
+        }
       }
-    }
-  }, [toolName]);
+    };
+
+    loadTool();
+    
+    // Small delay retry in case of race condition with localStorage
+    const timeout = setTimeout(loadTool, 500);
+    return () => clearTimeout(timeout);
+  }, [toolName, rawName]);
 
   const handleDelete = () => {
     const saved = localStorage.getItem('magic_tools');

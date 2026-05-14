@@ -79,44 +79,76 @@ export default function Chatbot() {
   }, [selectedBot]);
 
   const generateBotResponse = async (userMessage: string): Promise<string> => {
-    // Primary: Hugging Face Qwen2.5-Coder
-    try {
-      console.log("Trying Hugging Face (Qwen2.5-Coder)...");
-      const hfResponse = await fetch("https://api-inference.huggingface.co/models/Qwen/Qwen2.5-Coder-32B-Instruct", {
-        method: "POST",
-        headers: { 
-          "Authorization": `Bearer ${import.meta.env.VITE_HF_TOKEN || ''}`,
-          "Content-Type": "application/json"
-        },
-        body: JSON.stringify({ 
-          inputs: `<|im_start|>system\n${selectedBot.systemPrompt}<|im_end|>\n<|im_start|>user\n${userMessage}<|im_end|>\n<|im_start|>assistant\n`,
-          parameters: { max_new_tokens: 1000 }
-        })
-      });
-      
-      const data = await hfResponse.json();
-      let result = data.generated_text || data[0]?.generated_text || "";
-      
-      // Clean up Qwen response if it includes the prompt
-      if (result.includes("<|im_start|>assistant\n")) {
-        result = result.split("<|im_start|>assistant\n").pop().split("<|im_end|>")[0];
-      }
-      
-      if (!result || result.length < 5) throw new Error('HF Response invalid');
-      return result;
-      
-    } catch (error) {
-      console.log("Hugging Face failed, switching to Pollinations fallback...");
+    const models = [
+      "Qwen/Qwen2.5-Coder-32B-Instruct",
+      "deepseek-ai/DeepSeek-Coder-V2-Lite-Instruct",
+      "meta-llama/Llama-3.1-8B-Instruct",
+      "mistralai/Mistral-7B-Instruct-v0.3",
+      "codellama/CodeLlama-34b-Instruct-hf"
+    ];
+
+    for (const model of models) {
       try {
-        const response = await fetch(`https://text.pollinations.ai/${encodeURIComponent(userMessage)}?system=${encodeURIComponent(selectedBot.systemPrompt)}`);
-        if (!response.ok) throw new Error('Pollinations AI failed');
-        const text = await response.text();
-        if (!text || text.length < 5) throw new Error('Response too short');
-        return text;
-      } catch (pollError) {
-        return "I'm having trouble connecting to AI services. Please check your internet or try again later.";
+        console.log(`Using Hugging Face model: ${model}...`);
+        
+        let prompt = "";
+        if (model.includes("Qwen") || model.includes("DeepSeek")) {
+          prompt = `<|im_start|>system\n${selectedBot.systemPrompt}<|im_end|>\n<|im_start|>user\n${userMessage}<|im_end|>\n<|im_start|>assistant\n`;
+        } else if (model.includes("Llama")) {
+          prompt = `<|begin_of_text|><|start_header_id|>system<|end_header_id|>\n\n${selectedBot.systemPrompt}<|eot_id|><|start_header_id|>user<|end_header_id|>\n\n${userMessage}<|eot_id|><|start_header_id|>assistant<|end_header_id|>\n\n`;
+        } else if (model.includes("Mistral")) {
+          prompt = `<s>[INST] ${selectedBot.systemPrompt}\n\n${userMessage} [/INST]`;
+        } else {
+          prompt = `System: ${selectedBot.systemPrompt}\nUser: ${userMessage}\nAssistant:`;
+        }
+
+        const hfResponse = await fetch(`https://api-inference.huggingface.co/models/${model}`, {
+          method: "POST",
+          headers: { 
+            "Authorization": `Bearer ${import.meta.env.VITE_HF_TOKEN || ''}`,
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify({ 
+            inputs: prompt,
+            parameters: { 
+              max_new_tokens: 1000, 
+              return_full_text: false,
+              temperature: 0.7,
+              do_sample: true
+            },
+            options: {
+              wait_for_model: true
+            }
+          })
+        });
+
+        if (!hfResponse.ok) {
+          if (hfResponse.status === 401) break;
+          continue;
+        }
+
+        const data = await hfResponse.json();
+        if (data.error) continue;
+
+        let botText = Array.isArray(data) ? (data[0]?.generated_text || "") : (data.generated_text || "");
+        
+        // Clean up
+        if (botText.includes("<|im_start|>assistant\n")) {
+          botText = botText.split("<|im_start|>assistant\n").pop();
+        }
+        if (botText.includes("<|im_end|>")) botText = botText.split("<|im_end|>")[0];
+        if (botText.includes("<|eot_id|>")) botText = botText.split("<|eot_id|>")[0];
+
+        if (botText && botText.trim().length > 0) {
+          return botText.trim();
+        }
+      } catch (err) {
+        console.warn(`Model ${model} error:`, err);
+        continue;
       }
     }
+
+    return "I'm having trouble connecting to all AI services. Please try again later.";
   };
 
   const generateEducationalResponse = (message: string): string => {

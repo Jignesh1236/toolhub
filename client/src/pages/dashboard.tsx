@@ -26,6 +26,17 @@ export default function Dashboard() {
     localStorage.setItem('magic_tools', JSON.stringify(magicTools));
   }, [magicTools]);
 
+  // Sync state if localStorage changes from other tabs/components
+  useEffect(() => {
+    const handleStorageChange = (e: StorageEvent) => {
+      if (e.key === 'magic_tools') {
+        setMagicTools(e.newValue ? JSON.parse(e.newValue) : []);
+      }
+    };
+    window.addEventListener('storage', handleStorageChange);
+    return () => window.removeEventListener('storage', handleStorageChange);
+  }, []);
+
   const displayedTools = useMemo(() => {
     let filtered = [];
     
@@ -58,6 +69,16 @@ export default function Dashboard() {
   }, [activeCategory, searchQuery, magicTools]);
 
   const handleSeeMagic = async () => {
+    const token = import.meta.env.VITE_HF_TOKEN;
+    if (!token) {
+      toast({
+        title: "Configuration Missing",
+        description: "Hugging Face API token is not configured. Please add VITE_HF_TOKEN to your environment.",
+        variant: "destructive",
+      });
+      return;
+    }
+
     setIsGenerating(true);
     try {
       const systemPrompt = `Create a high-quality, professional-grade, and detailed single-file HTML tool. 
@@ -71,36 +92,105 @@ export default function Dashboard() {
       
       const userPrompt = `Generate a fully functional tool for "${searchQuery}".`;
       
-      // Primary: Pollinations AI
+      const codingModels = [
+        "Qwen/Qwen2.5-Coder-32B-Instruct",
+        "deepseek-ai/DeepSeek-Coder-V2-Lite-Instruct",
+        "meta-llama/Llama-3.1-8B-Instruct",
+        "mistralai/Mistral-7B-Instruct-v0.3",
+        "codellama/CodeLlama-34b-Instruct-hf"
+      ];
+
       let html = "";
-      try {
-        const response = await fetch(`https://text.pollinations.ai/${encodeURIComponent(userPrompt)}?system=${encodeURIComponent(systemPrompt)}&seed=${Math.floor(Math.random() * 1000)}&model=qwen-coder`);
-        if (!response.ok) throw new Error("Pollinations failed");
-        html = await response.text();
-      } catch (pollError) {
-        console.log("Pollinations failed, trying Hugging Face fallback...");
-        // Fallback: Hugging Face Qwen Coder
-        const hfResponse = await fetch("https://api-inference.huggingface.co/models/Qwen/Qwen2.5-Coder-32B-Instruct", {
-          method: "POST",
-          headers: { 
-            "Authorization": `Bearer ${import.meta.env.VITE_HF_TOKEN || ''}`,
-            "Content-Type": "application/json"
-          },
-          body: JSON.stringify({ 
-            inputs: `<|im_start|>system\n${systemPrompt}<|im_end|>\n<|im_start|>user\n${userPrompt}<|im_end|>\n<|im_start|>assistant\n`,
-            parameters: { max_new_tokens: 2000 }
-          })
-        });
-        
-        const data = await hfResponse.json();
-        html = data.generated_text || data[0]?.generated_text || "";
-        
-        if (html.includes("<|im_start|>assistant\n")) {
-          html = html.split("<|im_start|>assistant\n").pop().split("<|im_end|>")[0];
+      let success = false;
+
+      for (const model of codingModels) {
+        try {
+          console.log(`Trying Hugging Face model: ${model}...`);
+          
+          // Use appropriate prompt format for each model
+          let prompt = "";
+          if (model.includes("Qwen") || model.includes("DeepSeek")) {
+            prompt = `<|im_start|>system\n${systemPrompt}<|im_end|>\n<|im_start|>user\n${userPrompt}<|im_end|>\n<|im_start|>assistant\n`;
+          } else if (model.includes("Llama")) {
+            prompt = `<|begin_of_text|><|start_header_id|>system<|end_header_id|>\n\n${systemPrompt}<|eot_id|><|start_header_id|>user<|end_header_id|>\n\n${userPrompt}<|eot_id|><|start_header_id|>assistant<|end_header_id|>\n\n`;
+          } else if (model.includes("Mistral")) {
+            prompt = `<s>[INST] ${systemPrompt}\n\n${userPrompt} [/INST]`;
+          } else {
+            prompt = `System: ${systemPrompt}\nUser: ${userPrompt}\nAssistant:`;
+          }
+
+          const hfResponse = await fetch(`https://api-inference.huggingface.co/models/${model}`, {
+            method: "POST",
+            headers: { 
+              "Authorization": `Bearer ${import.meta.env.VITE_HF_TOKEN || ''}`,
+              "Content-Type": "application/json"
+            },
+            body: JSON.stringify({ 
+              inputs: prompt,
+              parameters: { 
+                max_new_tokens: 2000, 
+                return_full_text: false,
+                temperature: 0.7,
+                do_sample: true
+              },
+              options: {
+                wait_for_model: true
+              }
+            })
+          });
+          
+          if (!hfResponse.ok) {
+            const errBody = await hfResponse.text();
+            console.warn(`Model ${model} failed:`, errBody);
+            // If token is invalid, we should probably stop trying other models
+            if (hfResponse.status === 401) {
+              toast({
+                title: "Authentication Error",
+                description: "Hugging Face token is invalid or missing.",
+                variant: "destructive"
+              });
+              break;
+            }
+            continue; // Try next model
+          }
+          
+          const data = await hfResponse.json();
+          
+          // Handle potential error in JSON response
+          if (data.error) {
+            console.warn(`Model ${model} returned error:`, data.error);
+            continue;
+          }
+
+          // Hugging Face can return an array or a single object
+          html = Array.isArray(data) ? (data[0]?.generated_text || "") : (data.generated_text || "");
+          
+          // Clean up response based on common model output patterns
+          if (html.includes("<|im_start|>assistant\n")) {
+            html = html.split("<|im_start|>assistant\n").pop();
+          }
+          if (html.includes("<|im_end|>")) {
+            html = html.split("<|im_end|>")[0];
+          }
+          if (html.includes("<|eot_id|>")) {
+            html = html.split("<|eot_id|>")[0];
+          }
+          
+          // Final check - ensure we have something substantial
+          if (html && html.trim().length > 100) { 
+            console.log(`Success with model: ${model}`);
+            success = true;
+            break; 
+          } else {
+            console.warn(`Model ${model} response too short: ${html?.length} chars`);
+          }
+        } catch (err) {
+          console.warn(`Model ${model} error:`, err);
+          continue;
         }
       }
       
-      if (html && html.length > 100) {
+      if (success && html) {
         let finalHtml = html;
         // Clean up markdown code blocks if AI wrapped them
         if (finalHtml.includes('```html')) {
@@ -119,7 +209,16 @@ export default function Dashboard() {
           finalHtml = `<!DOCTYPE html><html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><script src="https://cdn.tailwindcss.com"></script><link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"></head><body class="bg-gray-50 dark:bg-slate-900">${finalHtml}</body></html>`;
         }
 
-        setMagicTools(prev => [...prev, { name: searchQuery, html: finalHtml }]);
+        const newTool = { name: searchQuery, html: finalHtml };
+        
+        // Update local storage immediately before navigation
+        const saved = localStorage.getItem('magic_tools');
+        const currentMagicTools = saved ? JSON.parse(saved) : [];
+        const updatedMagicTools = [...currentMagicTools.filter((t: any) => t.name !== searchQuery), newTool];
+        localStorage.setItem('magic_tools', JSON.stringify(updatedMagicTools));
+
+        setMagicTools(updatedMagicTools);
+        
         toast({
            title: "✨ Magic happened!",
            description: `A new tool for "${searchQuery}" has been created. Opening now...`,
