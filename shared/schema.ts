@@ -35,6 +35,30 @@ export const bookmarks = pgTable("bookmarks", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
+export const sharedFiles = pgTable("shared_files", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  filename: text("filename").notNull(),
+  originalName: text("original_name").notNull(),
+  mimeType: text("mime_type").notNull(),
+  fileSize: integer("file_size").notNull(),
+  uploadedAt: timestamp("uploaded_at").defaultNow(),
+  expiresAt: timestamp("expires_at"),
+  downloadCount: integer("download_count").default(0),
+  maxDownloads: integer("max_downloads"),
+  isPublic: boolean("is_public").default(true),
+});
+
+export const sharedTexts = pgTable("shared_texts", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  title: text("title").notNull(),
+  content: text("content").notNull(),
+  uploadedAt: timestamp("uploaded_at").defaultNow(),
+  expiresAt: timestamp("expires_at"),
+  downloadCount: integer("download_count").default(0),
+  maxDownloads: integer("max_downloads"),
+  isPublic: boolean("is_public").default(true),
+});
+
 export const insertUserSchema = createInsertSchema(users).pick({
   username: true,
   password: true,
@@ -56,6 +80,18 @@ export const insertBookmarkSchema = createInsertSchema(bookmarks).omit({
   createdAt: true,
 });
 
+export const insertSharedFileSchema = createInsertSchema(sharedFiles).omit({
+  id: true,
+  uploadedAt: true,
+  downloadCount: true,
+});
+
+export const insertSharedTextSchema = createInsertSchema(sharedTexts).omit({
+  id: true,
+  uploadedAt: true,
+  downloadCount: true,
+});
+
 export type InsertUser = z.infer<typeof insertUserSchema>;
 export type User = typeof users.$inferSelect;
 export type Tool = typeof tools.$inferSelect;
@@ -64,3 +100,7 @@ export type ToolUsage = typeof toolUsage.$inferSelect;
 export type InsertToolUsage = z.infer<typeof insertToolUsageSchema>;
 export type Bookmark = typeof bookmarks.$inferSelect;
 export type InsertBookmark = z.infer<typeof insertBookmarkSchema>;
+export type SharedFile = typeof sharedFiles.$inferSelect;
+export type InsertSharedFile = z.infer<typeof insertSharedFileSchema>;
+export type SharedText = typeof sharedTexts.$inferSelect;
+export type InsertSharedText = z.infer<typeof insertSharedTextSchema>;

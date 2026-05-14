@@ -90,6 +90,7 @@ import KeywordExtractor from "@/pages/tools/keyword-extractor";
 import SentimentAnalyzer from "@/pages/tools/sentiment-analyzer";
 import FileShare from "@/pages/tools/file-share";
 import FileDownload from "@/pages/tools/file-download";
+import TextDownload from "@/pages/tools/download-text";
 import TextShare from "@/pages/tools/text-share";
 import MagicToolView from "@/pages/tools/magic-tool-view";
 
@@ -134,9 +135,10 @@ function Router() {
       
       {/* File Sharing */}
       <Route path="/tools/file-share" component={FileShare} />
-      <Route path="/download" component={FileDownload} />
-      
-      {/* Text Sharing */}
+        <Route path="/download" component={FileDownload} />
+        <Route path="/download-text" component={TextDownload} />
+        
+        {/* Text Sharing */}
       <Route path="/tools/text-share" component={TextShare} />
       
       {/* Media Tools */}

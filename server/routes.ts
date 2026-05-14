@@ -94,6 +94,92 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // File Sharing API (Database-backed)
+  app.post("/api/files", upload.single('file'), async (req, res) => {
+    try {
+      if (!req.file) return res.status(400).json({ error: "No file uploaded" });
+      
+      const { expiresIn } = req.body;
+      const expiresAt = expiresIn ? new Date(Date.now() + parseInt(expiresIn) * 3600 * 1000) : null;
+
+      const sharedFile = await storage.createSharedFile({
+        filename: req.file.filename,
+        originalName: req.file.originalname,
+        mimeType: req.file.mimetype,
+        fileSize: req.file.size,
+        expiresAt,
+        maxDownloads: req.body.maxDownloads ? parseInt(req.body.maxDownloads) : null,
+        isPublic: true
+      });
+
+      res.json(sharedFile);
+    } catch (error) {
+      console.error("File share error:", error);
+      res.status(500).json({ error: "Failed to share file" });
+    }
+  });
+
+  app.get("/api/files/:id", async (req, res) => {
+    try {
+      const file = await storage.getSharedFile(req.params.id);
+      if (!file) return res.status(404).json({ error: "File not found" });
+      res.json(file);
+    } catch (error) {
+      res.status(500).json({ error: "Internal server error" });
+    }
+  });
+
+  app.get("/api/files/:id/download", async (req, res) => {
+    try {
+      const file = await storage.getSharedFile(req.params.id);
+      if (!file) return res.status(404).json({ error: "File not found" });
+
+      const fs = await import('fs');
+      const path = await import('path');
+      const filePath = path.join('uploads', file.filename);
+
+      if (!fs.existsSync(filePath)) {
+        return res.status(404).json({ error: "File not found on disk" });
+      }
+
+      res.download(filePath, file.originalName);
+    } catch (error) {
+      console.error("Download error:", error);
+      res.status(500).json({ error: "Failed to download file" });
+    }
+  });
+
+  // Text Sharing API (Database-backed)
+  app.post("/api/texts", async (req, res) => {
+    try {
+      const { title, content, expiresIn, maxDownloads } = req.body;
+      const expiresAt = expiresIn ? new Date(Date.now() + parseInt(expiresIn) * 3600 * 1000) : null;
+
+      const sharedText = await storage.createSharedText({
+        title,
+        content,
+        expiresAt,
+        maxDownloads: maxDownloads ? parseInt(maxDownloads) : null,
+        isPublic: true
+      });
+
+      res.json(sharedText);
+    } catch (error) {
+      console.error("Text share error:", error);
+      res.status(500).json({ error: "Failed to share text" });
+    }
+  });
+
+  app.get("/api/texts/:id", async (req, res) => {
+    try {
+      const text = await storage.getSharedText(req.params.id);
+      if (!text) return res.status(404).json({ error: "Text not found" });
+      res.json(text);
+    } catch (error) {
+      res.status(500).json({ error: "Internal server error" });
+    }
+  });
+
   app.delete("/api/bookmarks/:toolId", async (req, res) => {
     try {
       const { toolId } = req.params;

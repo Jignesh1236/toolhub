@@ -25,7 +25,7 @@ export default function FileDownload() {
     );
   }
 
-  const directDownloadUrl = `https://tmpfiles.org/dl/${fileData.id}/${fileData.name}`;
+  const directDownloadUrl = `/api/files/${fileData.id}/download`;
 
   return (
     <div className="container mx-auto px-4 py-12 max-w-2xl">

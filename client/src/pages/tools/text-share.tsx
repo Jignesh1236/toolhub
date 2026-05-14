@@ -33,56 +33,40 @@ export default function TextShare() {
   const { toast } = useToast();
 
   const uploadMutation = useMutation({
-    mutationFn: async (data: { title: string; content: string; expiresIn?: string }) => {
-      const blob = new Blob([data.content], { type: "text/plain" });
-      const file = new File([blob], `${data.title.replace(/\s+/g, "_")}.txt`, { type: "text/plain" });
-      
-      const formData = new FormData();
-      formData.append("file", file);
-      
-      if (data.expiresIn) {
-        const seconds = Math.min(parseInt(data.expiresIn) * 3600, 86400);
-        formData.append("expire", seconds.toString());
-      }
-
-      const response = await fetch("https://tmpfiles.org/api/v1/upload", {
-        method: "POST",
-        body: formData,
+    mutationFn: async (data: { title: string; content: string; expiresIn?: string; maxDownloads?: string }) => {
+      const response = await apiRequest("POST", "/api/texts", {
+        title: data.title,
+        content: data.content,
+        expiresIn: data.expiresIn,
+        maxDownloads: data.maxDownloads
       });
-
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.error || "Upload failed");
-      }
       return response.json();
     },
-    onSuccess: async (response) => {
-      const data = response.data;
+    onSuccess: async (data) => {
       toast({
         title: "✅ Text shared successfully",
-        description: "Your text is now available for sharing via tmpfiles.org",
+        description: `Your text is now available for sharing. Expiring in ${expiresIn || '24'} hours.`,
       });
-      setTextContent("");
-      setTextTitle("");
-      setMaxDownloads("");
-      setExpiresIn("");
       
-      // Generate QR code for the share URL
+      const internalShareUrl = `${window.location.origin}/download-text?id=${data.id}`;
+      
+      // Generate QR code for the internal share URL
       try {
-        const qrCodeDataUrl = await QRCode.toDataURL(data.url, {
+        const qrCodeDataUrl = await QRCode.toDataURL(internalShareUrl, {
           width: 200,
           margin: 1,
-          color: {
-            dark: "#000000",
-            light: "#FFFFFF"
-          }
+          color: { dark: "#000000", light: "#FFFFFF" }
         });
         setQrCodeUrl(qrCodeDataUrl);
+        (window as any).lastInternalTextUrl = internalShareUrl;
       } catch (error) {
         console.error("QR code generation failed:", error);
       }
       
-      // queryClient.invalidateQueries({ queryKey: ["/api/texts"] });
+      setTextContent("");
+      setTextTitle("");
+      setMaxDownloads("");
+      setExpiresIn("24");
       setIsUploading(false);
     },
     onError: (error: any) => {

@@ -1,29 +1,17 @@
-import { type User, type InsertUser, type Tool, type InsertTool, type ToolUsage, type InsertToolUsage, type Bookmark, type InsertBookmark, type SharedFile, type InsertSharedFile } from "@shared/schema";
-
-interface SharedText {
-  id: string;
-  title: string;
-  content: string;
-  uploadedAt: Date;
-  expiresAt?: Date | null;
-  downloadCount: number;
-  maxDownloads?: number | null;
-  isPublic: boolean;
-}
-
-interface InsertSharedText {
-  title: string;
-  content: string;
-  expiresAt?: Date | null;
-  maxDownloads?: number | null;
-  isPublic: boolean;
-}
-import { randomUUID } from "crypto";
+import { 
+  users, tools, toolUsage, bookmarks, sharedFiles, sharedTexts,
+  type User, type InsertUser, type Tool, type InsertTool, 
+  type ToolUsage, type InsertToolUsage, type Bookmark, type InsertBookmark, 
+  type SharedFile, type InsertSharedFile, type SharedText, type InsertSharedText 
+} from "@shared/schema";
+import { db } from "./db";
+import { eq, and, lte, sql } from "drizzle-orm";
 
 export interface IStorage {
   getUser(id: string): Promise<User | undefined>;
   getUserByUsername(username: string): Promise<User | undefined>;
   createUser(user: InsertUser): Promise<User>;
+  
   recordToolUsage(usage: InsertToolUsage): Promise<ToolUsage>;
   addBookmark(bookmark: InsertBookmark): Promise<Bookmark>;
   removeBookmark(toolId: string, userId: string): Promise<void>;
@@ -34,84 +22,64 @@ export interface IStorage {
     bookmarked: number;
     timeSaved: string;
   }>;
+
+  // Sharing methods
+  createSharedFile(file: InsertSharedFile): Promise<SharedFile>;
+  getSharedFile(id: string): Promise<SharedFile | undefined>;
+  createSharedText(text: InsertSharedText): Promise<SharedText>;
+  getSharedText(id: string): Promise<SharedText | undefined>;
+  cleanupExpiredContent(): Promise<void>;
 }
 
-export class MemStorage implements IStorage {
-  private users: Map<string, User>;
-  private toolUsage: Map<string, ToolUsage>;
-  private bookmarks: Map<string, Bookmark>;
-
-  constructor() {
-    this.users = new Map();
-    this.toolUsage = new Map();
-    this.bookmarks = new Map();
-  }
-
+export class DatabaseStorage implements IStorage {
   async getUser(id: string): Promise<User | undefined> {
-    return this.users.get(id);
+    const [user] = await db.select().from(users).where(eq(users.id, id));
+    return user;
   }
 
   async getUserByUsername(username: string): Promise<User | undefined> {
-    return Array.from(this.users.values()).find(
-      (user) => user.username === username,
-    );
+    const [user] = await db.select().from(users).where(eq(users.username, username));
+    return user;
   }
 
   async createUser(insertUser: InsertUser): Promise<User> {
-    const id = randomUUID();
-    const user: User = { ...insertUser, id };
-    this.users.set(id, user);
+    const [user] = await db.insert(users).values(insertUser).returning();
     return user;
   }
 
   async recordToolUsage(insertUsage: InsertToolUsage): Promise<ToolUsage> {
-    const id = randomUUID();
-    const usage: ToolUsage = {
-      id,
-      toolId: insertUsage.toolId || null,
-      userId: insertUsage.userId || null,
-      usedAt: new Date(),
-      metadata: insertUsage.metadata || null
-    };
-    this.toolUsage.set(id, usage);
+    const [usage] = await db.insert(toolUsage).values({
+      toolId: insertUsage.toolId,
+      userId: insertUsage.userId,
+      metadata: insertUsage.metadata
+    }).returning();
     return usage;
   }
 
   async addBookmark(insertBookmark: InsertBookmark): Promise<Bookmark> {
-    // Check if bookmark already exists
-    const existingBookmark = Array.from(this.bookmarks.values()).find(
-      b => b.toolId === insertBookmark.toolId && b.userId === insertBookmark.userId
+    const [existing] = await db.select().from(bookmarks).where(
+      and(
+        eq(bookmarks.toolId, insertBookmark.toolId || ""),
+        eq(bookmarks.userId, insertBookmark.userId || "")
+      )
     );
-    
-    if (existingBookmark) {
-      return existingBookmark;
-    }
+    if (existing) return existing;
 
-    const id = randomUUID();
-    const bookmark: Bookmark = {
-      id,
-      toolId: insertBookmark.toolId || null,
-      userId: insertBookmark.userId || null,
-      createdAt: new Date()
-    };
-    this.bookmarks.set(id, bookmark);
+    const [bookmark] = await db.insert(bookmarks).values(insertBookmark).returning();
     return bookmark;
   }
 
   async removeBookmark(toolId: string, userId: string): Promise<void> {
-    const bookmark = Array.from(this.bookmarks.values()).find(
-      b => b.toolId === toolId && b.userId === userId
+    await db.delete(bookmarks).where(
+      and(
+        eq(bookmarks.toolId, toolId),
+        eq(bookmarks.userId, userId)
+      )
     );
-    
-    if (bookmark) {
-      this.bookmarks.delete(bookmark.id);
-    }
   }
 
   async getUserBookmarks(userId: string): Promise<Bookmark[]> {
-    return Array.from(this.bookmarks.values()).filter(
-      bookmark => bookmark.userId === userId
-    );
+    return await db.select().from(bookmarks).where(eq(bookmarks.userId, userId));
   }
 
   async getToolStats(userId: string): Promise<{
@@ -120,31 +88,56 @@ export class MemStorage implements IStorage {
     bookmarked: number;
     timeSaved: string;
   }> {
-    const userUsage = Array.from(this.toolUsage.values()).filter(
-      usage => usage.userId === userId
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    const usage = await db.select().from(toolUsage).where(
+      and(
+        eq(toolUsage.userId, userId),
+        lte(sql`${toolUsage.usedAt}`, today)
+      )
     );
 
-    const today = new Date();
-    const todayStart = new Date(today.getFullYear(), today.getMonth(), today.getDate());
-    
-    const usedToday = userUsage.filter(
-      usage => usage.usedAt && new Date(usage.usedAt) >= todayStart
-    ).length;
-
-    const bookmarked = Array.from(this.bookmarks.values()).filter(
-      bookmark => bookmark.userId === userId
-    ).length;
-
-    // Mock calculation for time saved (in practice, this would be based on actual tool usage metrics)
-    const timeSaved = `${Math.floor(userUsage.length * 0.5)}h`;
+    const userBookmarks = await this.getUserBookmarks(userId);
 
     return {
-      totalTools: 75, // Total available tools
-      usedToday,
-      bookmarked,
-      timeSaved
+      totalTools: 75,
+      usedToday: usage.length,
+      bookmarked: userBookmarks.length,
+      timeSaved: `${Math.floor(usage.length * 0.5)}h`
     };
+  }
+
+  async createSharedFile(file: InsertSharedFile): Promise<SharedFile> {
+    const [sharedFile] = await db.insert(sharedFiles).values(file).returning();
+    return sharedFile;
+  }
+
+  async getSharedFile(id: string): Promise<SharedFile | undefined> {
+    const [file] = await db.select().from(sharedFiles).where(eq(sharedFiles.id, id));
+    return file;
+  }
+
+  async createSharedText(text: InsertSharedText): Promise<SharedText> {
+    const [sharedText] = await db.insert(sharedTexts).values(text).returning();
+    return sharedText;
+  }
+
+  async getSharedText(id: string): Promise<SharedText | undefined> {
+    const [text] = await db.select().from(sharedTexts).where(eq(sharedTexts.id, id));
+    return text;
+  }
+
+  async cleanupExpiredContent(): Promise<void> {
+    const now = new Date();
+    await db.delete(sharedFiles).where(lte(sharedFiles.expiresAt, now));
+    await db.delete(sharedTexts).where(lte(sharedTexts.expiresAt, now));
+    
+    // Also clear everything older than 24h as requested
+    const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
+    await db.delete(sharedFiles).where(lte(sharedFiles.uploadedAt, twentyFourHoursAgo));
+    await db.delete(sharedTexts).where(lte(sharedTexts.uploadedAt, twentyFourHoursAgo));
   }
 }
 
-export const storage = new MemStorage();
+export const storage = new DatabaseStorage();

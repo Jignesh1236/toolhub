@@ -84,17 +84,12 @@ export default function FileShare() {
         xhr.onerror = () => reject(new Error("Network error"));
       });
 
-      xhr.open("POST", "https://tmpfiles.org/api/v1/upload");
+      xhr.open("POST", "/api/files");
       xhr.send(formData);
 
       const response: any = await uploadPromise;
-      const data = response.data; // data.url looks like "https://tmpfiles.org/12345/filename"
-      
-      // Parse the external URL to create an internal one
-      const urlParts = data.url.split('/');
-      const fileName = urlParts.pop();
-      const fileId = urlParts.pop();
-      const internalShareUrl = `${window.location.origin}/download?id=${fileId}&name=${fileName}`;
+      // Database response format
+      const internalShareUrl = `${window.location.origin}/download?id=${response.id}&name=${response.originalName}`;
 
       toast({
         title: "✅ File uploaded successfully",

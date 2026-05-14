@@ -1,6 +1,7 @@
 import express, { type Request, Response, NextFunction } from "express";
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
+import { storage } from "./storage";
 
 const app = express();
 app.use(express.json());
@@ -68,4 +69,14 @@ app.use((req, res, next) => {
   }, () => {
     log(`serving on port ${port}`);
   });
+
+  // Cleanup task: runs every hour to check for expired or 24h old content
+  setInterval(async () => {
+    try {
+      await storage.cleanupExpiredContent();
+      log("Cleanup task: Expired content cleared.");
+    } catch (error) {
+      console.error("Cleanup task error:", error);
+    }
+  }, 60 * 60 * 1000); // 1 hour
 })();
