@@ -5,3 +5,4 @@ pages_build_output_dir = "dist/public"
 
 [vars]
 # VITE_HF_TOKEN = "your_token_here" (Set this in Cloudflare Dashboard instead)
+#
