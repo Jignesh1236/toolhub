@@ -72,16 +72,26 @@ export default function Dashboard() {
       const userPrompt = `Generate a fully functional tool for "${searchQuery}".`;
       
       // Using a simpler URL structure for better reliability
-      const response = await fetch(`https://text.pollinations.ai/${encodeURIComponent(userPrompt)}?system=${encodeURIComponent(systemPrompt)}&seed=${Math.floor(Math.random() * 1000)}`);
+      const response = await fetch(`https://text.pollinations.ai/${encodeURIComponent(userPrompt)}?system=${encodeURIComponent(systemPrompt)}&seed=${Math.floor(Math.random() * 1000)}&model=qwen-coder`);
       const html = await response.text();
       
-      if (html && (html.includes('<!DOCTYPE html>') || html.includes('<html'))) {
+      if (html && html.length > 100) {
         let finalHtml = html;
         // Clean up markdown code blocks if AI wrapped them
         if (finalHtml.includes('```html')) {
           finalHtml = finalHtml.split('```html')[1].split('```')[0].trim();
         } else if (finalHtml.includes('```')) {
-          finalHtml = finalHtml.split('```')[1].split('```')[0].trim();
+          const parts = finalHtml.split('```');
+          if (parts.length >= 3) {
+            finalHtml = parts[1].trim();
+            // If the first line is a language tag, remove it
+            if (finalHtml.startsWith('html\n')) finalHtml = finalHtml.substring(5);
+          }
+        }
+
+        // Ensure it has basic HTML structure if it looks like just body content
+        if (!finalHtml.toLowerCase().includes('<html')) {
+          finalHtml = `<!DOCTYPE html><html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><script src="https://cdn.tailwindcss.com"></script><link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"></head><body class="bg-gray-50 dark:bg-slate-900">${finalHtml}</body></html>`;
         }
 
         setMagicTools(prev => [...prev, { name: searchQuery, html: finalHtml }]);
@@ -91,7 +101,7 @@ export default function Dashboard() {
          });
          setLocation(`/magic/${encodeURIComponent(searchQuery)}`);
        } else {
-         throw new Error("Invalid response from AI");
+         throw new Error("Response too short or invalid");
        }
     } catch (error) {
       console.error("Magic failed:", error);

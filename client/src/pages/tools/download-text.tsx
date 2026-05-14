@@ -1,25 +1,34 @@
 import { useLocation } from "wouter";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Type, Clock, ShieldCheck, Copy } from "lucide-react";
+import { Type, Clock, ShieldCheck, Copy, RefreshCw } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useToast } from "@/hooks/use-toast";
+import { supabase } from "@/lib/supabase";
 
 export default function TextDownload() {
   const [location] = useLocation();
   const [textData, setTextData] = useState<{ id: string; title: string; content: string } | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
   const { toast } = useToast();
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const id = params.get("id");
-    if (id) {
-      fetch(`/api/texts/${id}`)
-        .then(res => res.json())
-        .then(data => {
-          if (data.id) setTextData(data);
-        })
-        .catch(err => console.error("Fetch error:", err));
+    if (id && supabase) {
+      supabase
+        .from('shared_texts')
+        .select('*')
+        .eq('id', id)
+        .single()
+        .then(({ data, error }) => {
+          if (data && !error) {
+            setTextData(data);
+          }
+          setIsLoading(false);
+        });
+    } else {
+      setIsLoading(false);
     }
   }, [location]);
 
@@ -32,6 +41,14 @@ export default function TextDownload() {
       });
     }
   };
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <RefreshCw className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    );
+  }
 
   if (!textData) {
     return (
