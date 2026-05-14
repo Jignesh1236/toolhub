@@ -89,7 +89,9 @@ import Chatbot from "@/pages/tools/chatbot";
 import KeywordExtractor from "@/pages/tools/keyword-extractor";
 import SentimentAnalyzer from "@/pages/tools/sentiment-analyzer";
 import FileShare from "@/pages/tools/file-share";
+import FileDownload from "@/pages/tools/file-download";
 import TextShare from "@/pages/tools/text-share";
+import MagicToolView from "@/pages/tools/magic-tool-view";
 
 // New tools imports
 import BusinessCardGenerator from "@/pages/tools/business-card-generator";
@@ -132,6 +134,7 @@ function Router() {
       
       {/* File Sharing */}
       <Route path="/tools/file-share" component={FileShare} />
+      <Route path="/download" component={FileDownload} />
       
       {/* Text Sharing */}
       <Route path="/tools/text-share" component={TextShare} />
@@ -256,6 +259,7 @@ function Router() {
       
       {/* AI & Automation */}
       <Route path="/tools/chatbot" component={Chatbot} />
+      <Route path="/magic/:name" component={MagicToolView} />
       <Route path="/tools/content-summarizer" component={ContentSummarizer} />
       <Route path="/tools/keyword-extractor" component={KeywordExtractor} />
       <Route path="/tools/sentiment-analyzer" component={SentimentAnalyzer} />

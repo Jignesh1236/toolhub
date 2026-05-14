@@ -3,12 +3,13 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Upload, Share2, Download, Trash2, Clock, Eye, Link2, QrCode } from "lucide-react";
+import { Upload, Share2, Download, Trash2, Clock, Eye, Link2, QrCode, RefreshCw } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
+import { Progress } from "@/components/ui/progress";
 import QRCode from "qrcode";
 
 interface SharedFile {
@@ -27,60 +28,12 @@ interface SharedFile {
 export default function FileShare() {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [maxDownloads, setMaxDownloads] = useState<string>("");
-  const [expiresIn, setExpiresIn] = useState<string>("");
+  const [expiresIn, setExpiresIn] = useState<string>("24");
   const [qrCodeUrl, setQrCodeUrl] = useState<string>("");
+  const [internalUrl, setInternalUrl] = useState<string>("");
   const [isUploading, setIsUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
   const { toast } = useToast();
-
-  const uploadMutation = useMutation({
-    mutationFn: async (formData: FormData) => {
-      const response = await fetch("https://tmpfiles.org/api/v1/upload", {
-        method: "POST",
-        body: formData,
-      });
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.error || "Upload failed");
-      }
-      return response.json();
-    },
-    onSuccess: async (response) => {
-      const data = response.data;
-      toast({
-        title: "✅ File uploaded successfully",
-        description: "File is now available for sharing",
-      });
-      setSelectedFile(null);
-      setMaxDownloads("");
-      setExpiresIn("");
-      
-      // Generate QR code for the share URL
-      try {
-        const qrCodeDataUrl = await QRCode.toDataURL(data.url, {
-          width: 200,
-          margin: 1,
-          color: {
-            dark: "#000000",
-            light: "#FFFFFF"
-          }
-        });
-        setQrCodeUrl(qrCodeDataUrl);
-      } catch (error) {
-        console.error("QR code generation failed:", error);
-      }
-      
-      // queryClient.invalidateQueries({ queryKey: ["/api/files"] });
-      setIsUploading(false);
-    },
-    onError: (error: any) => {
-      toast({
-        title: "❌ Upload failed",
-        description: error.message,
-        variant: "destructive",
-      });
-      setIsUploading(false);
-    },
-  });
 
   const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -100,16 +53,76 @@ export default function FileShare() {
     }
 
     setIsUploading(true);
+    setUploadProgress(0);
+
     const formData = new FormData();
     formData.append("file", selectedFile);
     
     // tmpfiles.org uses 'expire' in seconds (60-86400)
-    if (expiresIn) {
-      const seconds = Math.min(parseInt(expiresIn) * 3600, 86400);
-      formData.append("expire", seconds.toString());
-    }
+    // Default to 24 hours (86400 seconds)
+    const seconds = expiresIn ? Math.min(parseInt(expiresIn) * 3600, 86400) : 86400;
+    
+    try {
+      const xhr = new XMLHttpRequest();
+      
+      // Track upload progress
+      xhr.upload.addEventListener("progress", (event) => {
+        if (event.lengthComputable) {
+          const percentComplete = Math.round((event.loaded / event.total) * 100);
+          setUploadProgress(percentComplete);
+        }
+      });
 
-    uploadMutation.mutate(formData);
+      const uploadPromise = new Promise((resolve, reject) => {
+        xhr.onload = () => {
+          if (xhr.status >= 200 && xhr.status < 300) {
+            resolve(JSON.parse(xhr.responseText));
+          } else {
+            reject(new Error(JSON.parse(xhr.responseText).error || "Upload failed"));
+          }
+        };
+        xhr.onerror = () => reject(new Error("Network error"));
+      });
+
+      xhr.open("POST", "https://tmpfiles.org/api/v1/upload");
+      xhr.send(formData);
+
+      const response: any = await uploadPromise;
+      const data = response.data; // data.url looks like "https://tmpfiles.org/12345/filename"
+      
+      // Parse the external URL to create an internal one
+      const urlParts = data.url.split('/');
+      const fileName = urlParts.pop();
+      const fileId = urlParts.pop();
+      const internalShareUrl = `${window.location.origin}/download?id=${fileId}&name=${fileName}`;
+
+      toast({
+        title: "✅ File uploaded successfully",
+        description: `File will be deleted in ${expiresIn || '24'} hours.`,
+      });
+
+      setSelectedFile(null);
+      setExpiresIn("24");
+      
+      // Generate QR code for the internal share URL
+      const qrCodeDataUrl = await QRCode.toDataURL(internalShareUrl, {
+        width: 200,
+        margin: 1,
+        color: { dark: "#000000", light: "#FFFFFF" }
+      });
+      setQrCodeUrl(qrCodeDataUrl);
+      setInternalUrl(internalShareUrl);
+
+    } catch (error: any) {
+      toast({
+        title: "❌ Upload failed",
+        description: error.message,
+        variant: "destructive",
+      });
+    } finally {
+      setIsUploading(false);
+      setUploadProgress(0);
+    }
   };
 
   const generateShareUrl = (fileId: string) => {
@@ -179,7 +192,7 @@ export default function FileShare() {
       <div className="text-center mb-8">
         <h1 className="text-3xl font-bold mb-4">File Share Tool</h1>
         <p className="text-lg text-muted-foreground">
-          Upload files aur QR code ke saath share karo. Files automatically save ho jaati hain aur download count track hota hai.
+          Upload files aur QR code ke saath share karo. Files selected time ke baad automatically delete ho jayengi.
         </p>
       </div>
 
@@ -250,13 +263,33 @@ export default function FileShare() {
               </Select>
             </div>
 
+            {isUploading && (
+              <div className="space-y-2 mt-4 mb-4">
+                <div className="flex justify-between text-sm">
+                  <span>Uploading...</span>
+                  <span>{uploadProgress}%</span>
+                </div>
+                <Progress value={uploadProgress} className="h-2" />
+              </div>
+            )}
+
             <Button
               onClick={handleUpload}
               disabled={!selectedFile || isUploading}
               className="w-full"
               data-testid="button-upload-file"
             >
-              {isUploading ? "Uploading..." : "Upload & Share"}
+              {isUploading ? (
+                <>
+                  <RefreshCw className="mr-2 h-4 w-4 animate-spin" />
+                  Uploading {uploadProgress}%
+                </>
+              ) : (
+                <>
+                  <Upload className="mr-2 h-4 w-4" />
+                  Upload & Share
+                </>
+              )}
             </Button>
           </CardContent>
         </Card>
@@ -283,6 +316,21 @@ export default function FileShare() {
               <p className="text-sm text-muted-foreground mt-2">
                 Share this QR code with anyone to let them access your file
               </p>
+              
+              <div className="mt-6 p-3 bg-muted rounded-lg flex items-center gap-2">
+                <Input 
+                  readOnly 
+                  value={internalUrl} 
+                  className="bg-background"
+                />
+                <Button 
+                  size="sm" 
+                  onClick={() => copyToClipboard(internalUrl)}
+                >
+                  <Link2 className="h-4 w-4 mr-2" />
+                  Copy
+                </Button>
+              </div>
             </CardContent>
           </Card>
         )}

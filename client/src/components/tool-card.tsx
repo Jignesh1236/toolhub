@@ -6,9 +6,10 @@ interface ToolCardProps {
   tool: Tool;
   onBookmark?: (toolId: string) => void;
   onClick?: (tool: Tool) => void;
+  onDelete?: (toolId: string) => void;
 }
 
-export function ToolCard({ tool, onBookmark, onClick }: ToolCardProps) {
+export function ToolCard({ tool, onBookmark, onClick, onDelete }: ToolCardProps) {
   const [isBookmarked, setIsBookmarked] = useState(tool.isBookmarked || false);
 
   const handleBookmark = (e: React.MouseEvent) => {
@@ -16,6 +17,12 @@ export function ToolCard({ tool, onBookmark, onClick }: ToolCardProps) {
     e.stopPropagation();
     setIsBookmarked(!isBookmarked);
     onBookmark?.(tool.id);
+  };
+
+  const handleDelete = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    onDelete?.(tool.id);
   };
 
   const handleClick = (e: React.MouseEvent) => {
@@ -68,13 +75,24 @@ export function ToolCard({ tool, onBookmark, onClick }: ToolCardProps) {
           <div className={`p-3 rounded-lg transition-colors ${colorClasses[tool.color as keyof typeof colorClasses]}`}>
             <i className={`${tool.icon} text-xl`}></i>
           </div>
-          <button 
-            onClick={handleBookmark}
-            className="text-gray-400 hover:text-yellow-500 transition-colors"
-            data-testid={`bookmark-${tool.id}`}
-          >
-            <i className={isBookmarked ? "fas fa-bookmark text-yellow-500" : "far fa-bookmark"}></i>
-          </button>
+          <div className="flex gap-2">
+            {tool.isMagic && (
+              <button 
+                onClick={handleDelete}
+                className="text-gray-400 hover:text-red-500 transition-colors"
+                title="Delete tool"
+              >
+                <i className="fas fa-trash-alt"></i>
+              </button>
+            )}
+            <button 
+              onClick={handleBookmark}
+              className="text-gray-400 hover:text-yellow-500 transition-colors"
+              data-testid={`bookmark-${tool.id}`}
+            >
+              <i className={isBookmarked ? "fas fa-bookmark text-yellow-500" : "far fa-bookmark"}></i>
+            </button>
+          </div>
         </div>
         <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">{tool.name}</h3>
         <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">{tool.description}</p>

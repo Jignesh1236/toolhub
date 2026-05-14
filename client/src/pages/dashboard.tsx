@@ -6,15 +6,14 @@ import { tools, getToolsByCategory, searchTools, toolCategories } from "@/lib/to
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { useLocation } from "wouter";
 
 export default function Dashboard() {
+  const [location, setLocation] = useLocation();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [activeCategory, setActiveCategory] = useState('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [isGenerating, setIsGenerating] = useState(false);
-  const [generatedHtml, setGeneratedHtml] = useState<string | null>(null);
-  const [showMagicDialog, setShowMagicDialog] = useState(false);
   const { toast } = useToast();
 
   // Load magic tools from local storage
@@ -29,55 +28,60 @@ export default function Dashboard() {
 
   const displayedTools = useMemo(() => {
     let filtered = [];
-    if (searchQuery.trim()) {
-      filtered = searchTools(searchQuery);
-    } else {
-      filtered = getToolsByCategory(activeCategory);
-    }
     
-    // Add magic tools to search results if they match
+    // Map magic tools to Tool format
+    const magicAsTools = magicTools.map(t => ({
+      id: `magic-${t.name}`,
+      name: t.name,
+      category: 'magic',
+      description: `AI generated tool for ${t.name}`,
+      icon: 'fas fa-magic',
+      route: `/magic/${encodeURIComponent(t.name)}`,
+      color: 'purple',
+      isMagic: true,
+      html: t.html
+    }));
+
     if (searchQuery.trim()) {
       const query = searchQuery.toLowerCase();
-      const matchingMagic = magicTools.filter(t => t.name.toLowerCase().includes(query));
-      // Map magic tools to Tool format
-      const magicAsTools = matchingMagic.map(t => ({
-        id: `magic-${t.name}`,
-        name: t.name,
-        category: 'ai',
-        description: `AI generated tool for ${t.name}`,
-        icon: 'fas fa-magic',
-        route: `/magic/${encodeURIComponent(t.name)}`,
-        color: 'purple',
-        isMagic: true,
-        html: t.html
-      }));
-      return [...filtered, ...magicAsTools];
-    }
+      filtered = searchTools(searchQuery);
+      const matchingMagic = magicAsTools.filter(t => t.name.toLowerCase().includes(query));
+      return [...filtered, ...matchingMagic];
+    } 
     
+    if (activeCategory === 'magic') {
+      return magicAsTools;
+    }
+
+    filtered = getToolsByCategory(activeCategory);
     return filtered;
   }, [activeCategory, searchQuery, magicTools]);
 
   const handleSeeMagic = async () => {
     setIsGenerating(true);
     try {
-      const prompt = `Generate a single-file HTML tool for "${searchQuery}" with embedded CSS and JS. 
-      The tool should be modern, responsive, and fully functional. 
-      Return ONLY the complete HTML code starting with <!DOCTYPE html>. 
-      Do not include any other text or explanation. 
-      Use Tailwind CSS via CDN if needed.`;
+      const prompt = `Create a high-quality, professional-grade, and detailed single-file HTML tool for "${searchQuery}". 
+      Requirements:
+      1. Modern and beautiful UI using Tailwind CSS.
+      2. Comprehensive features related to "${searchQuery}".
+      3. Mobile-responsive design.
+      4. Interactive elements with polished JavaScript.
+      5. Dark mode support.
+      6. Clear instructions and professional layout.
+      Return ONLY the complete HTML code. No talk, just code.`;
       
       const response = await fetch(`https://text.pollinations.ai/${encodeURIComponent(prompt)}`);
       const html = await response.text();
       
       if (html) {
-        setGeneratedHtml(html);
         setMagicTools(prev => [...prev, { name: searchQuery, html }]);
-        setShowMagicDialog(true);
         toast({
-          title: "✨ Magic happened!",
-          description: `A new tool for "${searchQuery}" has been created.`,
-        });
-      }
+           title: "✨ Magic happened!",
+           description: `A new tool for "${searchQuery}" has been created. Opening now...`,
+         });
+         // Redirect to the new tool immediately
+         setLocation(`/magic/${encodeURIComponent(searchQuery)}`);
+       }
     } catch (error) {
       console.error("Magic failed:", error);
       toast({
@@ -106,11 +110,16 @@ export default function Dashboard() {
   };
 
   const handleToolClick = (tool: Tool) => {
-    if (tool.isMagic && tool.html) {
-      setGeneratedHtml(tool.html);
-      setSearchQuery(tool.name); // Set search query to magic tool name for display
-      setShowMagicDialog(true);
-    }
+    // Standard tools use the link in ToolCard
+  };
+
+  const handleDeleteMagicTool = (toolId: string) => {
+    const toolName = toolId.replace('magic-', '');
+    setMagicTools(prev => prev.filter(t => t.name !== toolName));
+    toast({
+      title: "Tool deleted",
+      description: `Magic tool "${toolName}" has been removed.`,
+    });
   };
 
   return (
@@ -237,7 +246,7 @@ export default function Dashboard() {
                   key={tool.id} 
                   tool={tool} 
                   onBookmark={() => {}} 
-                  onClick={() => handleToolClick(tool)} 
+                  onDelete={handleDeleteMagicTool}
                 />
               ))}
             </div>
@@ -251,19 +260,19 @@ export default function Dashboard() {
                 </p>
                 {searchQuery && (
                   <Button 
-                    onClick={handleSeeMagic} 
+                    onClick={handleSeeMagic}
                     disabled={isGenerating}
-                    className="bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white"
+                    className="bg-purple-600 hover:bg-purple-700 text-white"
                   >
                     {isGenerating ? (
                       <>
                         <i className="fas fa-spinner fa-spin mr-2"></i>
-                        Magic in progress...
+                        Creating Magic...
                       </>
                     ) : (
                       <>
                         <i className="fas fa-magic mr-2"></i>
-                        See the magic
+                        Create "{searchQuery}" with AI
                       </>
                     )}
                   </Button>
@@ -288,43 +297,7 @@ export default function Dashboard() {
         </main>
       </div>
 
-      {/* Magic Tool Dialog */}
-      <Dialog open={showMagicDialog} onOpenChange={setShowMagicDialog}>
-        <DialogContent className="max-w-4xl w-[90vw] h-[80vh] flex flex-col p-0 overflow-hidden">
-          <DialogHeader className="p-4 border-b">
-            <DialogTitle className="flex items-center gap-2">
-              <i className="fas fa-magic text-purple-600"></i>
-              AI Generated Tool: {searchQuery}
-            </DialogTitle>
-          </DialogHeader>
-          <div className="flex-1 overflow-hidden">
-            {generatedHtml && (
-              <iframe
-                srcDoc={generatedHtml}
-                title="Magic Tool"
-                className="w-full h-full border-0"
-                sandbox="allow-scripts allow-forms allow-modals"
-              />
-            )}
-          </div>
-          <div className="p-4 border-t flex justify-end gap-2">
-            <Button variant="outline" onClick={() => setShowMagicDialog(false)}>
-              Close
-            </Button>
-            <Button onClick={() => {
-              const blob = new Blob([generatedHtml || ''], { type: 'text/html' });
-              const url = URL.createObjectURL(blob);
-              const a = document.createElement('a');
-              a.href = url;
-              a.download = `${searchQuery.replace(/\s+/g, '_')}_tool.html`;
-              a.click();
-            }}>
-              <i className="fas fa-download mr-2"></i>
-              Download Tool
-            </Button>
-          </div>
-        </DialogContent>
-      </Dialog>
+
     </div>
   );
 }

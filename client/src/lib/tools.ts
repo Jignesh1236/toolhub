@@ -29,6 +29,7 @@ export const toolCategories = [
   { id: 'calculators', name: 'Calculators', icon: 'fas fa-calculator' },
   { id: 'networking', name: 'Network Tools', icon: 'fas fa-network-wired' },
   { id: 'ai', name: 'AI & Automation', icon: 'fas fa-robot' },
+  { id: 'magic', name: 'Magic Tools', icon: 'fas fa-magic-wand-sparkles' },
 ];
 
 export const tools: Tool[] = [
