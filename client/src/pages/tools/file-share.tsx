@@ -104,12 +104,12 @@ export default function FileShare() {
       const { data: savedFile, error: dbError } = await supabase
         .from('shared_files')
         .insert([{
-          originalName: selectedFile.name,
+          original_name: selectedFile.name,
           filename: fileName,
-          mimeType: selectedFile.type,
-          fileSize: selectedFile.size,
+          mime_type: selectedFile.type,
+          file_size: selectedFile.size,
           expires_at: expiresIn ? new Date(Date.now() + parseInt(expiresIn) * 3600 * 1000).toISOString() : null,
-          publicUrl: publicUrl
+          public_url: publicUrl
         }])
         .select()
         .single();
@@ -145,6 +145,42 @@ export default function FileShare() {
     } finally {
       setIsUploading(false);
       setUploadProgress(0);
+    }
+  };
+
+  const handleDelete = async (fileId: string, filename: string) => {
+    try {
+      if (!supabase) return;
+
+      // 1. Delete from storage
+      const { error: storageError } = await supabase.storage
+        .from('toolhub-files')
+        .remove([`uploads/${filename}`]);
+
+      if (storageError) {
+        console.error("Storage delete error:", storageError);
+      }
+
+      // 2. Delete from database
+      const { error: dbError } = await supabase
+        .from('shared_files')
+        .delete()
+        .eq('id', fileId);
+
+      if (dbError) throw dbError;
+
+      toast({
+        title: "✅ File deleted",
+        description: "The shared file has been removed successfully.",
+      });
+
+      refetch();
+    } catch (error: any) {
+      toast({
+        title: "❌ Delete failed",
+        description: error.message,
+        variant: "destructive",
+      });
     }
   };
 
@@ -380,11 +416,11 @@ export default function FileShare() {
                       <FileText className="h-6 w-6 text-primary" />
                     </div>
                     <div className="flex-1 min-w-0">
-                      <p className="font-medium truncate" title={file.originalName}>
-                        {file.originalName}
+                      <p className="font-medium truncate" title={file.originalName || (file as any).original_name}>
+                        {file.originalName || (file as any).original_name}
                       </p>
                       <p className="text-xs text-muted-foreground">
-                        {formatFileSize(file.fileSize)} • {new Date(file.uploadedAt || (file as any).uploaded_at).toLocaleDateString()}
+                        {formatFileSize(file.fileSize || (file as any).file_size)} • {new Date(file.uploadedAt || (file as any).uploaded_at).toLocaleDateString()}
                       </p>
                     </div>
                   </div>
@@ -395,7 +431,7 @@ export default function FileShare() {
                         <span>Expires: {file.expiresAt || (file as any).expires_at ? new Date(file.expiresAt || (file as any).expires_at).toLocaleTimeString() : '24h'}</span>
                       </div>
                       <Badge variant="outline" className="text-[10px]">
-                        {file.downloadCount || (file as any).download_count || 0} downloads
+                        {(file.downloadCount || (file as any).download_count) || 0} downloads
                       </Badge>
                     </div>
                     <div className="flex gap-2">
@@ -404,7 +440,7 @@ export default function FileShare() {
                         size="sm" 
                         className="flex-1"
                         onClick={() => {
-                          const url = `${window.location.origin}/download?id=${file.id}&name=${file.originalName}`;
+                          const url = `${window.location.origin}/download?id=${file.id}&name=${file.originalName || (file as any).original_name}`;
                           copyToClipboard(url);
                         }}
                       >
@@ -415,10 +451,18 @@ export default function FileShare() {
                         variant="primary" 
                         size="sm" 
                         className="flex-1"
-                        onClick={() => window.open(`${window.location.origin}/download?id=${file.id}&name=${file.originalName}`, '_blank')}
+                        onClick={() => window.open(`${window.location.origin}/download?id=${file.id}&name=${file.originalName || (file as any).original_name}`, '_blank')}
                       >
                         <Download className="h-3 w-3 mr-1" />
                         Download
+                      </Button>
+                      <Button 
+                        variant="destructive" 
+                        size="sm" 
+                        className="px-2"
+                        onClick={() => handleDelete(file.id, file.filename)}
+                      >
+                        <Trash2 className="h-3 w-3" />
                       </Button>
                     </div>
                   </div>

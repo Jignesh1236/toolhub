@@ -18,7 +18,7 @@ async function fetchSharedTexts() {
   const { data, error } = await supabase
     .from('shared_texts')
     .select('*')
-    .order('uploadedAt', { ascending: false });
+    .order('uploaded_at', { ascending: false });
   if (error) throw error;
   return data || [];
 }
@@ -60,9 +60,9 @@ export default function TextShare() {
         .insert([{
           title: data.title,
           content: data.content,
-          expiresAt: expiresAt,
-          maxDownloads: data.maxDownloads ? parseInt(data.maxDownloads) : null,
-          isPublic: true
+          expires_at: expiresAt,
+          max_downloads: data.maxDownloads ? parseInt(data.maxDownloads) : null,
+          is_public: true
         }])
         .select()
         .single();
@@ -136,6 +136,32 @@ export default function TextShare() {
     };
 
     uploadMutation.mutate(data);
+  };
+
+  const handleDelete = async (textId: string) => {
+    try {
+      if (!supabase) return;
+
+      const { error } = await supabase
+        .from('shared_texts')
+        .delete()
+        .eq('id', textId);
+
+      if (error) throw error;
+
+      toast({
+        title: "✅ Text deleted",
+        description: "The shared text has been removed successfully.",
+      });
+
+      refetch();
+    } catch (error: any) {
+      toast({
+        title: "❌ Delete failed",
+        description: error.message,
+        variant: "destructive",
+      });
+    }
   };
 
   const generateShareUrl = (textId: string) => {
@@ -356,7 +382,7 @@ export default function TextShare() {
                         <span>Expires: {text.expiresAt || (text as any).expires_at ? new Date(text.expiresAt || (text as any).expires_at).toLocaleTimeString() : '24h'}</span>
                       </div>
                       <Badge variant="outline" className="text-[10px]">
-                        {text.downloadCount || (text as any).download_count || 0} views
+                        {(text.downloadCount || (text as any).download_count) || 0} views
                       </Badge>
                     </div>
                     <div className="flex gap-2">
@@ -381,6 +407,14 @@ export default function TextShare() {
                       >
                         <Eye className="h-3 w-3 mr-1" />
                         View
+                      </Button>
+                      <Button 
+                        variant="destructive" 
+                        size="sm" 
+                        className="px-2"
+                        onClick={() => handleDelete(text.id)}
+                      >
+                        <Trash2 className="h-3 w-3" />
                       </Button>
                     </div>
                   </div>
